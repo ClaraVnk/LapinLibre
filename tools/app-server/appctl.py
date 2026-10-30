@@ -101,9 +101,10 @@ COMMANDS = [
      "listen for one of the words (speech recognition)",
      "The rabbit records what it hears and sends it to the recognition server, which answers with the word "
      "it heard.\n"
-     "This app server only pretends to recognise speech: it doesn't analyse the recording, it always "
+     "By default this app server only pretends to recognise speech: it doesn't analyse the recording, it "
      "answers with the first word (or what asr-answer chooses). That is enough to test the rabbit's "
-     "recording and answers, not to understand you.\n"
+     "recording and answers. With asr-answer recognise (or --asr-answer recognise) it listens to the "
+     "recording and answers with the word you said, or that nothing matched.\n"
      "The rabbit sends recordings to the server named in its voice.conf. Out of the box that is the old "
      "Karotz servers, which no longer exist; the README shows how to point it at this server.\n"
      "Example: listen en-US yes no", I),
@@ -146,10 +147,11 @@ COMMANDS = [
      "show what applications reported to the server",
      "Applications report by calling the server's /log address (devicetest does). The answer has the reports "
      "and a count; give that count as SINCE next time to see only the newer ones.\nExample: app-log 12", F),
-    ("Testing and development", "asr-answer", "[first|nomatch|WORDS...]",
+    ("Testing and development", "asr-answer", "[recognise|first|nomatch|WORDS...]",
      "choose what speech recognition answers from now on",
-     "first: the first of the words listen offered (the default); nomatch: that nothing matched; anything "
-     "else: those words.\nExample: asr-answer nomatch", F),
+     "recognise: what was said, with the model (asr_server.py --fetch gets it); first: the first of the "
+     "words listen offered (the default); nomatch: that nothing matched; anything else: those words.\n"
+     "Example: asr-answer recognise", F),
     ("Testing and development", "take-as", "ID [SECONDS]",
      "take interactive mode under an id of your choice",
      "For testing the rabbit: an empty id (take-as \"\") must be refused (BAD_INTERACTIVEID).", F),

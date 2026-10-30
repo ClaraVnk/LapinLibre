@@ -8,7 +8,7 @@ The app server is the platform server for the rabbit. You run it on your own com
 | `app_server.py` | The platform server. It also serves the application downloads, the HTTP endpoints for applications and the REST API. It can also start the speech server and the speech-recognition server. |
 | `appctl.py` | The control tool. It sends commands to a running `app_server.py`. |
 | `tts_server.py` | The speech (TTS) server. voice-daemon on the rabbit sends text to it and plays the MP3 that it returns. |
-| `asr_server.py` | The speech-recognition (ASR) server. It does not recognise speech. It sends back a result that you choose. |
+| `asr_server.py` | The speech-recognition (ASR) server. It recognises what was said with a speech model, or sends back a result that you choose. |
 | `rest_api.py` | The REST API for external applications. `app_server.py` loads it. You do not run it alone. |
 
 The app server is not part of the install image, and the build does not need it. It has no authentication (see [Security](#security)). For the platform protocol, the controller and karotzVM, see [system.md](system.md). For the USB key and `lapinlibre.txt`, see [install.md](install.md).
@@ -155,8 +155,8 @@ Messages are `PlatformMessage` protobufs from `userland/proto/platform-message.p
 | `--hold` | off | Do not log the controller in until `appctl.py login`. The tests use it. |
 | `--tts-port N` | none | Also start the speech server on this port. If there is no MP3 encoder or no speech engine, the server logs a message and continues without speech. |
 | `--asr-port N` | none | Also start the speech-recognition server on this port. |
-| `--asr-answer A` | `first` | What the speech-recognition server answers: `first`, `nomatch`, or the words. |
-| `--uploads DIR` | `uploads/` in `tools/app-server` | The folder for files posted to `/upload`, and for `asr-last.raw`. The server makes it if it does not exist. |
+| `--asr-answer A` | `first` | What the speech-recognition server answers: `recognise` (what was said), `first`, `nomatch`, or the words. |
+| `--uploads DIR` | `uploads/` in `tools/app-server` | The folder for files posted to `/upload`, and for `asr-last.raw` and `asr-last.wav`. The server makes it if it does not exist. |
 | `--codec C` | `auto` | `auto`, `python` or `protoc`. See [Codec and packages](#codec-and-packages). |
 | `--protoc CMD` | `protoc` | The protoc command, for the `protoc` codec. |
 | `--proto PATH` | `../../userland/proto/platform-message.proto` (from the script) | The protocol definition, for the `protoc` codec. |
@@ -320,7 +320,7 @@ The commands marked "yes" need interactive mode: run `take` first. Without inter
 | `choreography` | `FILE` | yes | Plays a choreography file. |
 | `ping` | | yes | Sends `ping` and shows the reply. |
 | `app-log` | `[SINCE]` | no | Shows the reports that applications sent to `/log` after the first SINCE reports, and the count. The server keeps the last 1000. |
-| `asr-answer` | `[first\|nomatch\|WORDS...]` | no | Sets what the speech-recognition server answers. Default `first`. Needs `--asr-port`. |
+| `asr-answer` | `[recognise\|first\|nomatch\|WORDS...]` | no | Sets what the speech-recognition server answers. Default `first`. Needs `--asr-port`; `recognise` also needs the model files. |
 | `take-as` | `ID [SECONDS]` | no | Starts interactive mode with the given id. The controller refuses the empty id (`""`) with `BAD_INTERACTIVEID`. |
 | `login` | | no | Sends the authentication token. For a server started with `--hold`. |
 | `send` | `MESSAGE...` | no | Sends a `PlatformMessage` in text format. The server adds the interactive id if you are in interactive mode. |
@@ -411,24 +411,39 @@ uv run python tts_server.py --selftest
 
 ### The speech-recognition server
 
-The speech-recognition server answers voice-daemon's recognition requests with a result that you choose. It does not analyse the audio. voice-daemon connects over TCP to the server in `voice.conf` `[asr]`. It sends the grammar (ABNF text, or a URL of a grammar), then the audio in parts. Each message is an `AsrMsg` (`userland/proto/asr-message.proto`) with a 4-byte length in network byte order before it. When 1.5 seconds of audio have arrived, the server sends one `AsrMsg` with a `Response`.
+The speech-recognition server answers voice-daemon's recognition requests. It can recognise what was said (`recognise`), or send back a result that you choose. voice-daemon connects over TCP to the server in `voice.conf` `[asr]`. It sends the grammar (ABNF text, or a URL of a grammar), then the audio in parts, until the server answers. Each message is an `AsrMsg` (`userland/proto/asr-message.proto`) with a 4-byte length in network byte order before it. The server sends one `AsrMsg` with a `Response`.
+
+The audio is 8-bit mu-law, mono, 8000 samples a second: voice-daemon reads `/dev/audio` at 16 kHz and sends every second byte (checked with a 1 kHz tone played on the rabbit, 2026-10-30).
 
 | Answer setting | What the server answers |
 |---|---|
+| `recognise` | What was said. Silero VAD finds the end of the speech: the answer comes 0.7 s after the speaker stops, or 8 s after the speech starts. Parakeet TDT 0.6B v3 (int8, on the CPU) makes the words, in any of its 25 European languages (English, French, German, Spanish, Italian, Dutch and Portuguese among them); it finds the language from the audio. The server answers the grammar's alternative closest to the words (code `OK`, with its semantic; the score, 60 to 100, is how close it is), or `NOMATCH` with the words heard when no alternative is close enough. A sound shorter than 0.6 s that matches nothing (a cough, the long-press tone), or one without words, is not answered: the server listens on. With no answer after 8 s of audio, it answers `NOINPUT` (or what it heard last). |
 | `first` | The first alternative of the grammar, code `OK`, score 80, with the semantic of that alternative. |
 | `nomatch` | Code `NOMATCH`. |
 | other text | That text as the words, code `OK`, score 80, with the semantic of the alternative that has the same words, if there is one. |
 
-For a grammar given by URL: when the server runs inside `app_server.py`, a URL that ends in `/asr/grammar/<id>.abnf` gets the launch grammar of the app server. The controller gives this URL with its `domain_app` host. Another URL is downloaded. When the session ends, the server logs the length of the audio. Inside `app_server.py`, it keeps the audio of the last session as `asr-last.raw` in the uploads folder (16-bit mono, 16 kHz).
+The fixed answers come when 1.5 seconds of audio have arrived. For `recognise`, the closeness is the edit distance on the words, after the case, the accents and the punctuation are removed: 1 minus the distance divided by the length of the longer of the two. An alternative said whole inside a longer phrase counts 0.9. The lowest that answers an alternative is 0.6. A grammar without alternatives gets the words heard. The detector's threshold is 0.35, lower than Silero's default of 0.5: the rabbit's microphone is quiet (a spoken word at about -35 dBFS), and 0.5 cut the start of the word. A phrase of 3 to 5 seconds takes 0.2 to 0.3 s to recognise on a desktop CPU; the model takes about 5 s to load, once.
+
+`recognise` needs the `sherpa-onnx` package (`uv sync` in `tools/app-server`) and the model files, about 640 MB, in `~/.cache/lapinlibre/asr`:
+
+```
+uv run python asr_server.py --fetch
+```
+
+`--fetch` downloads `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2` and `silero_vad.onnx` from the `asr-models` release of k2-fsa/sherpa-onnx on GitHub, checks the SHA-256 of each, and unpacks the archive. The server checks the SHA-256 of each model file when it loads them. Parakeet v3 is under CC-BY-4.0, Silero VAD under MIT.
+
+For a grammar given by URL: when the server runs inside `app_server.py`, a URL that ends in `/asr/grammar/<id>.abnf` gets the launch grammar of the app server. The controller gives this URL with its `domain_app` host. Another URL is downloaded. When the session ends, the server logs the length of the audio. Inside `app_server.py`, it keeps the audio of the last session in the uploads folder: `asr-last.raw` (as sent: mu-law, 8 kHz) and `asr-last.wav` (16-bit).
 
 | Option of `asr_server.py` | Default | What it does |
 |---|---|---|
 | `--listen ADDR` | `0.0.0.0` | The listen address. |
 | `--port N` | `8443` | The port. |
-| `--answer A` | `first` | `first`, `nomatch` or the words. |
-| `--keep DIR` | none | Keeps the audio of the last session in `DIR/asr-last.raw`. |
+| `--answer A` | `first` | `recognise`, `first`, `nomatch` or the words. |
+| `--keep DIR` | none | Keeps the audio of the last session in `DIR/asr-last.raw` and `DIR/asr-last.wav`. |
+| `--models DIR` | `~/.cache/lapinlibre/asr` | The model files. |
+| `--fetch` | off | Downloads the model files into `--models`, then stops. |
 
-`asr_server.py` alone keeps `asr-last.raw` only with `--keep`, and cannot get the launch grammar from the app server. It needs only the standard library.
+`asr_server.py` alone keeps the audio only with `--keep`, and cannot get the launch grammar from the app server. Without `recognise` it needs only the standard library.
 
 ### How the rabbit finds the server
 
@@ -471,3 +486,5 @@ Run the server on your own machine, on a trusted network. Do not put it on a pub
 ### Tests
 
 `tests/app_server/test_app_server.py` starts `app_server.py` with the `protoc` codec on free local ports, with `--asr-port`. It plays the controller: it connects, answers the login, and checks what the server sends. It tests the social keys, the contact list, the pending-message flag, the message queries, `/text`, `/log`, the uploads, `info`, `system`, `pending`, `take-as`, `send-raw`, `events-since`, the commands that need interactive mode, the speech-recognition answers and the launch grammar, and the REST API (bad signature, start, command, callback, stop). The protoc argument defaults to the host protoc of the build, or `protoc` on the `PATH`.
+
+`tests/app_server/test_asr_server.py` tests `recognise`: the mu-law table and the upsampling, the match to the grammar (accents, punctuation, a phrase inside a longer one, nothing close), and whole sessions over TCP through the model. The sessions send the model's own recordings (German, English, Spanish, French) as the rabbit sends audio (8 kHz mu-law in 1024-byte parts): each answers its own sentence with its semantic; words not in the grammar give `NOMATCH`; silence gives `NOINPUT`; a short sound first is not answered; the end of the speech comes after the silence. They need sherpa-onnx and the model files, else they are skipped: in `tools/app-server`, `uv run python -I -B ../../tests/app_server/test_asr_server.py`.

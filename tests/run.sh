@@ -53,7 +53,9 @@ section() {
     [ "${PIPESTATUS[0]}" = 0 ] || status=1
 }
 
-# The app server (tools/app-server) against a fake controller, with the system build's protoc 2.3.0.
+# The app server (tools/app-server) against a fake controller, with the system build's protoc 2.3.0;
+# then its speech recognition (the sessions through the model only where sherpa-onnx and the model
+# files are, else skipped).
 app_server_tests() {
     local out
     if out=$("$LL_PY" -I -B -W ignore::ResourceWarning "$T/app_server/test_app_server.py" \
@@ -62,6 +64,13 @@ app_server_tests() {
     else
         printf '%s\n' "$out" | tail -40
         echo "FAIL  app server"
+        return 1
+    fi
+    if out=$("$LL_PY" -I -B "$T/app_server/test_asr_server.py" 2>&1); then
+        echo "PASS  app server speech recognition: $(printf '%s\n' "$out" | grep -oE 'Ran [0-9]* tests|skipped=[0-9]*' | tr '\n' ' ')"
+    else
+        printf '%s\n' "$out" | tail -40
+        echo "FAIL  app server speech recognition"
         return 1
     fi
 }

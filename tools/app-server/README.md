@@ -16,4 +16,11 @@ uv run python appctl.py status
 uv run python appctl.py run hello
 ```
 
+For speech recognition that listens (Parakeet v3, about 640 MB of model files), fetch the models once and start with `--asr-answer recognise`:
+
+```
+uv run python asr_server.py --fetch
+uv run python app_server.py --apps example-apps --settings settings.example.json --asr-port 8443 --asr-answer recognise
+```
+
 The server has no authentication. Run it on your own machine, on a trusted network.

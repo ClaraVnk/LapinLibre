@@ -480,7 +480,7 @@ multimedia-daemon plays music and records from the microphone. It has two back e
 voice-daemon speaks text (TTS) and recognises speech (ASR). It reads `/usr/etc/conf/voice.conf`.
 
 - TTS: `tts_speak` starts a child process. The child sends the text with an HTTP POST to the server for the language in `[tts]` (the key is the first two letters of `lang`, in lower case). It sends the answer (MP3) to `madplay -a 1.5 -`. Only one text is spoken at a time. The connection to the speech server must be made within 3 s; until it fails, the rabbit counts as speaking.
-- ASR: `asr_start_string` and `asr_start_file` connect over TCP to a server in `[asr]` (`server0` and up, `nbserver`, `port`). The first server is chosen at random, the next ones in turn when a connection fails. The daemon sends the grammar, then the microphone (`/dev/audio`, mu-law, 16 kHz, mono) until the server answers. Each message on the socket is a 4-byte big-endian length and a `lapinlibre.asr.AsrMsg` (`userland/proto/asr-message.proto`). A connection to a TTS or an ASR server has a time limit.
+- ASR: `asr_start_string` and `asr_start_file` connect over TCP to a server in `[asr]` (`server0` and up, `nbserver`, `port`). The first server is chosen at random, the next ones in turn when a connection fails. The daemon sends the grammar, then the microphone until the server answers: it reads `/dev/audio` (mu-law, 16 kHz, mono) and sends every second byte, so the server gets mu-law at 8000 samples a second. Each message on the socket is a 4-byte big-endian length and a `lapinlibre.asr.AsrMsg` (`userland/proto/asr-message.proto`). A connection to a TTS or an ASR server has a time limit.
 
 | Method | Arguments (in) | Out | What it does |
 |---|---|---|---|

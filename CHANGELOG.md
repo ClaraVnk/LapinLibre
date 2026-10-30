@@ -17,6 +17,11 @@
 - At boot the start-up stops its own LED tool as soon as led-daemon is on the bus, and led-daemon goes on pulsing the nose cyan until the clock is set and the rabbit is ready.
 - A snapshot copies the camera's picture and leaves `/tmp/picture.jpg` in place: `/tmp` stays root's.
 
+### Added
+
+- The test speech-recognition server can recognise what is said (`asr_server.py --answer recognise`, `app_server.py --asr-answer recognise`): Parakeet TDT 0.6B v3 on the CPU, through sherpa-onnx (a new package of `tools/app-server`), in 25 European languages, with Silero VAD to find the end of the speech. It answers the grammar's alternative closest to what was said, or that nothing matched, or that nobody spoke. On the rabbit, a long press and "hello" starts the Hello application. `asr_server.py --fetch` gets the model files (about 640 MB).
+- The rabbit's recognition audio is now documented as it is: mu-law at 8000 samples a second (voice-daemon reads 16 kHz and sends every second byte), not 16 kHz.
+
 ## v0.2.0 (2026-10-28)
 
 ### Fixed

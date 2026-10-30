@@ -834,7 +834,8 @@ def main():
     p.add_argument("--asr-port", type=int,
                    help="also run the speech-recognition server (asr_server.py) on this port, e.g. 8443")
     p.add_argument("--asr-answer", default="first",
-                   help='what it answers: "first" (the grammar\'s first alternative), "nomatch" or the words')
+                   help='what it answers: "recognise" (what was said, with the model; asr_server.py --fetch), '
+                        '"first" (the grammar\'s first alternative), "nomatch" or the words')
     p.add_argument("--uploads", default=str(HERE / "uploads"),
                    help="where POSTs to /upload are saved (default: uploads/ next to this script)")
     p.add_argument("--tts-port", type=int,
@@ -884,14 +885,18 @@ def main():
         # Also a separate service on the rabbit (voice.conf [asr]).
         sys.path.insert(0, str(HERE))
         import asr_server
-        asr = asr_server.asr_server(a.listen, a.asr_port, a.asr_answer, keep=a.uploads)
-        threading.Thread(target=asr.serve_forever, daemon=True).start()
-        Platform.asr_answer = staticmethod(asr_server.set_answer)
-        # The controller names its launch grammar http://<server>/asr/grammar/<id>.abnf (port 80):
-        # this server's own grammar answers for it.
-        asr_server.set_grammar_source(
-            lambda url: apps.grammar_text() if re.search(r"/asr/grammar/[^/]+\.abnf$", url) else None)
-        speech += f", recognition on :{a.asr_port}"
+        try:
+            asr = asr_server.asr_server(a.listen, a.asr_port, a.asr_answer, keep=a.uploads)
+        except (RuntimeError, OSError) as e:
+            log(f"speech recognition not started: {e}")
+        else:
+            threading.Thread(target=asr.serve_forever, daemon=True).start()
+            Platform.asr_answer = staticmethod(asr_server.set_answer)
+            # The controller names its launch grammar http://<server>/asr/grammar/<id>.abnf (port 80):
+            # this server's own grammar answers for it.
+            asr_server.set_grammar_source(
+                lambda url: apps.grammar_text() if re.search(r"/asr/grammar/[^/]+\.abnf$", url) else None)
+            speech += f", recognition on :{a.asr_port}"
 
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

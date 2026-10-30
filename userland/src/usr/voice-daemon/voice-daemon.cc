@@ -14,7 +14,8 @@
  * connect over TCP to one of the recognition servers in [asr] (server<n>,
  * nbserver, port; the first one is picked at random, the next ones in turn
  * when a connection fails), send the grammar, then stream the microphone
- * (/dev/audio, OSS, mu-law 16 kHz mono) from an idle callback until the
+ * (/dev/audio, OSS, mu-law 16 kHz mono; every second byte is sent, so the
+ * server gets 8 kHz) from an idle callback until the
  * server answers. Every message on the socket is a 4-byte big-endian length
  * followed by a serialized lapinlibre.asr.AsrMsg (asr-message.proto).
  * The answer becomes asr_event(uid, words, semantic, score), or
