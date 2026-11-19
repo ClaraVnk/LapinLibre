@@ -1,22 +1,25 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
-# The setup network, for startup.sh when the rabbit has no Wi-Fi settings or can't join its
-# network:   hotspot.sh [SECONDS]   (how long it stays open, default 600)
-# The rabbit becomes the access point "Karotz-XXXX" (the last four hex digits of its MAC): WPA2,
-# with an eight-digit passphrase drawn at random each time and said out loud twice, never an open
-# network that anyone passing by could use to set the rabbit up. The nose pulses purple. A phone
-# that joins gets an address (udhcpd) and the setup page, http://192.168.75.1/setup.html, which
-# hands the Wi-Fi settings over (cgi-bin/wifi_setup, as the user web, into $RUN/in); this checks
-# them again, writes them as the key's install does and reboots the rabbit.
+# The setup network, for startup.sh while the rabbit has no network:
+#   hotspot.sh press      waits for a long press of the head (3 s), then asks for the setup network
+#                         (the start-up's retry loop opens it: $RUN/wanted)
+#   hotspot.sh [SECONDS]  opens it (default 600 s)
+# The rabbit becomes the open access point "Karotz-XXXX" (the last four hex digits of its MAC), as
+# a smart plug's setup network is (Clara, 2026-11-19). Open: what is typed on the page crosses the
+# air in the clear, so it opens only on a press of the head -- whoever opens it has the rabbit in
+# hand -- and closes as soon as the rabbit is set up, or after SECONDS. The nose pulses purple. A
+# phone that joins gets an address (udhcpd) and the setup page, http://192.168.75.1/setup.html,
+# which hands the Wi-Fi settings over (cgi-bin/wifi_setup, as the user web, into $RUN/in); this
+# checks them again, writes them as the key's install does and reboots the rabbit.
 # Exits 0 once settings are saved (the reboot follows), 1 when nobody set it up in time or the
-# radio refused to be an access point; the network is then left as it was found, down.
+# radio refused to be an access point; the network is then left down, for the retry loop.
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/karotz/bin:/usr/karotz/bin
 export PATH
 RUN=/var/run/hotspot
 LIMIT=${1:-600}
 ADDR=192.168.75.1
-SOUNDS=/usr/karotz/sounds/digits
 LED=/karotz/bin/led
+BUTTON=/dev/rabbit_button
 
 log() {
     echo "hotspot: $*"
@@ -30,19 +33,26 @@ stop() {
     rm -rf $RUN/active $RUN/wpa.conf $RUN/udhcpd.conf $RUN/in
 }
 
-# say PASS: the digits one by one, in the rabbit's language when there are sounds for it, else in
-# English; nothing when the image has no digit sounds (the page and the LED still work).
-say() {
-    lang=$(sed -n 's/^lang=\([a-z][a-z]\).*/\1/p' /usr/etc/conf/karotz.conf 2> /dev/null | head -n 1)
-    [ -f "$SOUNDS/${lang:-en}_0.mp3" ] || lang=en
-    [ -f "$SOUNDS/${lang}_0.mp3" ] || { log "no digit sounds in $SOUNDS"; return 0; }
-    rest=$1
-    while [ -n "$rest" ]; do
-        d=${rest%"${rest#?}"}
-        rest=${rest#?}
-        karotz-player "$SOUNDS/${lang}_$d.mp3" > /dev/null 2>&1
+# press: a long press of the head (held 3 s or more), then $RUN/wanted. /dev/rabbit_button gives
+# '1' on a press and anything else on its release (userland button-daemon.c); the daemons that
+# read it run only once the network is up, so it is free while this waits.
+press() {
+    mkdir -p $RUN
+    while :; do
+        b=$(dd if=$BUTTON bs=1 count=1 2> /dev/null) || { sleep 5; continue; }
+        [ "$b" = 1 ] || continue
+        down=$(date +%s)
+        dd if=$BUTTON bs=1 count=1 > /dev/null 2>&1
+        if [ $(($(date +%s) - down)) -ge 3 ]; then
+            log "long press: the setup network is asked for"
+            : > $RUN/wanted
+            killall led 2> /dev/null
+            $LED -l 8000FF -p 000000 -d 200 &
+        fi
     done
 }
+
+[ "$1" = press ] && { press; exit 0; }
 
 # take: the settings the page handed over, checked again (the page's own rules), into
 # /usr/etc/conf as applysettings.sh writes them (WPA2 and WPA3, an address from the router).
@@ -64,20 +74,16 @@ take() {
 mac=$(tr -d ':' < /sys/class/net/wlan0/address 2> /dev/null)
 [ ${#mac} -eq 12 ] || { log "no wlan0"; exit 1; }
 suffix=$(printf '%s' "${mac#????????}" | tr a-f A-F)
-# Eight digits from /dev/urandom (seeded by startup.sh): one byte each, the bytes 250 and up
-# dropped so that every digit is as likely.
-pass=$(od -An -v -tu1 -N64 /dev/urandom | tr -s ' ' '\n' | awk '$1 != "" && $1 < 250 { printf "%d", $1 % 10; if (++n == 8) exit }')
-[ ${#pass} -eq 8 ] || { log "no random digits"; exit 1; }
 
 mkdir -p $RUN
 (
     umask 077
-    printf 'ap_scan=2\nnetwork={\nssid="Karotz-%s"\nmode=2\nfrequency=2437\nkey_mgmt=WPA-PSK\nproto=RSN\npairwise=CCMP\ngroup=CCMP\npsk="%s"\n}\n' \
-        "$suffix" "$pass" > $RUN/wpa.conf
+    printf 'ap_scan=2\nnetwork={\nssid="Karotz-%s"\nmode=2\nfrequency=2437\nkey_mgmt=NONE\n}\n' \
+        "$suffix" > $RUN/wpa.conf
     printf 'start 192.168.75.10\nend 192.168.75.40\ninterface wlan0\nmax_leases 8\nlease_file %s/leases\npidfile %s/udhcpd.pid\nopt subnet 255.255.255.0\nopt lease 600\n' \
         "$RUN" "$RUN" > $RUN/udhcpd.conf
 )
-rm -f $RUN/saved
+rm -f $RUN/saved $RUN/wanted
 rm -rf $RUN/in
 mkdir -p $RUN/in && chown web $RUN/in && chmod 700 $RUN/in || { log "no drop folder for the web user"; exit 1; }
 : > $RUN/leases
@@ -94,9 +100,6 @@ udhcpd $RUN/udhcpd.conf
 log "Karotz-$suffix open for ${LIMIT} s: http://$ADDR/setup.html"
 killall led 2> /dev/null
 $LED -l 8000FF -p 000000 -d 700 &
-say "$pass"
-sleep 2
-say "$pass"
 
 i=0
 while [ $i -lt "$LIMIT" ] && [ ! -f $RUN/saved ]; do
