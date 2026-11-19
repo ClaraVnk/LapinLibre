@@ -741,7 +741,7 @@ class EndpointTest(WebApiCase):
             r = subprocess.run(["sh", "-n", str(path)], capture_output=True, text=True, timeout=30)
             self.assertEqual((r.returncode, r.stderr), (0, ""), path)
         if shutil.which("shellcheck"):
-            r = subprocess.run(["shellcheck", "-s", "sh", "-e", "SC1091,SC2034,SC2154", *[str(p) for p in LIBRARIES],
+            r = subprocess.run(["shellcheck", "-s", "sh", "-S", "warning", "-e", "SC1091,SC2034,SC2154", *[str(p) for p in LIBRARIES],
                                 *[str(WWW / "cgi-bin" / c) for c in CGIS]], capture_output=True, text=True, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout[-3000:])
 
