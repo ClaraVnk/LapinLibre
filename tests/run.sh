@@ -91,6 +91,53 @@ make_sysroot() {
     echo "PASS  sysroot $S ($(readlink "$S/usr/lib/libglib-2.0.so.0"), $(readlink "$S/lib/ld-uClibc.so.1"))"
 }
 
+# LL_TEST_JOBS (default: one per core): the aggressive tests run in that many
+# shards at once, each in its own network namespace (some listen on fixed
+# ports: 9123, 8088, 6600), with a default route on the loopback so that a
+# connection out is refused as on a host with nothing behind, not "network
+# unreachable". They wait mostly on real time, which is why the whole run was
+# 65 minutes on four idle cores. Not sharded: the behaviour scenarios (their
+# records are compared line by line) and SERIAL below, whose timings break
+# under load (button presses measured in milliseconds). --record: one shard.
+JOBS=${LL_TEST_JOBS:-$(nproc 2> /dev/null || echo 1)}
+SERIAL="button_bounce button_empty_reads"
+
+# harness_shards SUITE NAME...: harness over NAME..., SERIAL first and alone,
+# the others in JOBS shards; their outputs follow one another.
+harness_shards() {
+    local suite=$1; shift
+    local names=() serial=() n i k rc=0 dir
+    for x in "$@"; do
+        case " $SERIAL " in *" $x "*) serial+=("$x") ;; *) names+=("$x") ;; esac
+    done
+    n=${#names[@]}
+    if [ ${#RECORD[@]} -gt 0 ] || [ "$JOBS" -le 1 ] || [ "$n" -le 1 ] \
+       || ! unshare --user --map-current-user --net true 2> /dev/null; then
+        harness "$suite" "$@"
+        return
+    fi
+    [ ${#serial[@]} -gt 0 ] && { harness "$suite" "${serial[@]}" || rc=1; }
+    local jobs=$JOBS
+    [ "$jobs" -gt "$n" ] && jobs=$n
+    dir=$(mktemp -d)
+    local pids=()
+    for ((i = 0; i < jobs; i++)); do
+        local shard=()
+        for ((k = i; k < n; k += jobs)); do shard+=("${names[k]}"); done
+        unshare --user --map-current-user --net -- \
+            bash -c 'ip link set lo up 2> /dev/null; ip route add default dev lo 2> /dev/null; exec "$@"' harness \
+            timeout 7200 "$LL_PY" -I -B "$T/harness.py" --suite "$suite" --sysroot "$S" --build "$B" \
+            --fakes "$F" --expected "$T/expected" "${shard[@]}" > "$dir/$i.out" 2>&1 &
+        pids+=($!)
+    done
+    for ((i = 0; i < jobs; i++)); do
+        wait "${pids[i]}" || rc=1
+        cat "$dir/$i.out"
+    done
+    rm -rf "$dir"
+    return $rc
+}
+
 # harness SUITE NAME...
 harness() {
     local suite=$1; shift
@@ -108,14 +155,21 @@ if [ ${#ONLY[@]} -gt 0 ]; then
     section "test preloads" build_fakes
     section "behaviour scenarios" harness scenarios "${ONLY[@]}"
 else
-    section "image tests" "$LL_PY" -I -B "$T/image/run.py"
+    # The image tests need nothing the others build: they run alongside, and
+    # their section is printed when they end (before the system tests).
+    IMG=$(mktemp)
+    "$LL_PY" -I -B "$T/image/run.py" > "$IMG" 2>&1 & img_pid=$!
     section "test preloads" build_fakes
     section "app server tests" app_server_tests
     section "sysroot" make_sysroot
     # shellcheck disable=SC2086
     section "behaviour scenarios (qemu-user)" harness scenarios $SCENARIOS
     # shellcheck disable=SC2086
-    section "aggressive tests (qemu-user)" harness aggressive $AGGRESSIVE
+    section "aggressive tests (qemu-user)" harness_shards aggressive $AGGRESSIVE
+    printf '== %s\n' "image tests" | tee -a "$LOG"
+    wait "$img_pid" || status=1
+    tee -a "$LOG" < "$IMG"
+    rm -f "$IMG"
     if [ ${#RECORD[@]} = 0 ]; then
         section "libmpd retries on EINTR" bash "$LL_ROOT/system/tests/libmpd-eintr.sh"
         section "mpd-karotz" bash "$LL_ROOT/system/tests/mpd-karotz.sh"
