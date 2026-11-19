@@ -95,8 +95,12 @@ def fingerprint(b64):
 def sandbox_copy(src, dst, sb):
     """A program or the library with its absolute paths and PATH moved into the sandbox."""
     text = src.read_text(encoding="utf-8")
-    text = text.replace("PATH=/bin:/sbin:/usr/bin:/usr/sbin\n", f"PATH={sb}/bin\n")
+    # The paths are moved first and the sandbox's own PATH goes in after: the sandbox lives under
+    # /tmp (tempfile's default), and SANDBOXED moves /tmp, so a PATH put in first was moved again
+    # into a directory that does not exist, and every tool was "not found".
+    text = text.replace("PATH=/bin:/sbin:/usr/bin:/usr/sbin\n", "PATH=@SANDBOX_BIN@\n")
     text = SANDBOXED.sub(lambda m: f"{sb}{m.group(0)}", text)
+    text = text.replace("PATH=@SANDBOX_BIN@\n", f"PATH={sb}/bin\n")
     if text.startswith("#!/bin/sh\n"):
         text = f"#!{sb}/bin/sh\n" + text[len("#!/bin/sh\n"):]
     dst.parent.mkdir(parents=True, exist_ok=True)
