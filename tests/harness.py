@@ -578,7 +578,7 @@ def main():
         warnings = unexpected_warnings(module, workdir)
         if warnings:
             failed += 1
-            print(f"FAIL  {label}: warnings in its log that EXPECTED_WARNINGS doesn't list (logs in {workdir})")
+            print(f"FAIL  {label}: warnings in its log that EXPECTED_WARNINGS doesn't list (logs in {workdir}) ({took})")
             for line in warnings[:20]:
                 print(f"    {line}")
             if len(warnings) > 20:
@@ -593,7 +593,7 @@ def main():
                 print(f"      {label}: {module.summary(record)}")
             if problems:
                 failed += 1
-                print(f"FAIL  {label} (logs in {workdir})")
+                print(f"FAIL  {label} (logs in {workdir}) ({took})")
                 for problem in problems:
                     print(f"    {problem}")
                 (workdir / "record.txt").write_text("\n".join(record) + "\n")
@@ -627,7 +627,7 @@ def main():
         else:
             failed += 1
             (workdir / "record.txt").write_text(text)
-            print(f"FAIL  {label}: record differs from {expected_file} (logs and record.txt in {workdir})")
+            print(f"FAIL  {label}: record differs from {expected_file} (logs and record.txt in {workdir}) ({took})")
             diff = list(difflib.unified_diff(expected, record, "expected", "this run", lineterm=""))
             for line in diff[:80]:
                 print("   ", line)
