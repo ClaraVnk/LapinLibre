@@ -741,7 +741,9 @@ class EndpointTest(WebApiCase):
             r = subprocess.run(["sh", "-n", str(path)], capture_output=True, text=True, timeout=30)
             self.assertEqual((r.returncode, r.stderr), (0, ""), path)
         if shutil.which("shellcheck"):
-            r = subprocess.run(["shellcheck", "-s", "sh", "-S", "warning", "-e", "SC1091,SC2034,SC2154", *[str(p) for p in LIBRARIES],
+            # SC3003/SC3013/SC3028/SC3045 ($'..', -nt, $RANDOM, read -n): BusyBox ash has them, POSIX sh does not, and
+            # shellcheck before 0.10 has no busybox dialect to say so.
+            r = subprocess.run(["shellcheck", "-s", "sh", "-S", "warning", "-e", "SC1091,SC2034,SC2154,SC3003,SC3013,SC3028,SC3045", *[str(p) for p in LIBRARIES],
                                 *[str(WWW / "cgi-bin" / c) for c in CGIS]], capture_output=True, text=True, timeout=120)
             self.assertEqual(r.returncode, 0, r.stdout[-3000:])
 
