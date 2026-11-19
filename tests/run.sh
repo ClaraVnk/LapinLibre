@@ -102,7 +102,9 @@ make_sysroot() {
 # SERIAL run first and alone: their timings break under load (presses measured in milliseconds).
 # --record: one at a time.
 JOBS=${LL_TEST_JOBS:-$(( $(nproc 2> /dev/null || echo 1) * 2 ))}
-SERIAL="button_bounce button_empty_reads"
+# karotzVM and multimedia_daemon compare their whole record, whose order shifted under load
+# (2026-11-20: a reply before an LED line); karotzvm_reply_ends counts on running out of memory.
+SERIAL="button_bounce button_empty_reads karotzVM multimedia_daemon karotzvm_reply_ends"
 DURATIONS=$F/durations
 
 # harness_pool SUITE:NAME...: every test, SERIAL first and alone, the rest in JOBS balanced shards;
