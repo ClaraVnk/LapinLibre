@@ -91,6 +91,43 @@ make_sysroot() {
     echo "PASS  sysroot $S ($(readlink "$S/usr/lib/libglib-2.0.so.0"), $(readlink "$S/lib/ld-uClibc.so.1"))"
 }
 
+# The scenarios and the aggressive tests run in LL_TEST_JOBS shards at once (default: one per
+# core). They wait mostly on real time (daemon start, D-Bus timeouts, late replies), so a run
+# was 45 minutes on four idle cores. Each shard has its own network namespace: some scenarios
+# listen on fixed ports (9123, 8088, 6600), which would collide otherwise; every scenario
+# already has its own D-Bus daemon and work directory. --record runs one shard, in order.
+JOBS=${LL_TEST_JOBS:-$(nproc 2> /dev/null || echo 1)}
+
+# harness_shards SUITE NAME...: harness SUITE over NAME... in JOBS shards, each in its own
+# network namespace; their outputs follow one another, and any shard failing fails the section.
+harness_shards() {
+    local suite=$1; shift
+    local names=("$@") n=$# jobs=$JOBS dir i k rc=0
+    if [ ${#RECORD[@]} -gt 0 ] || [ "$jobs" -le 1 ] || [ "$n" -le 1 ] \
+       || ! unshare --user --map-current-user --net true 2> /dev/null; then
+        harness "$suite" "$@"
+        return
+    fi
+    [ "$jobs" -gt "$n" ] && jobs=$n
+    dir=$(mktemp -d)
+    local pids=()
+    for ((i = 0; i < jobs; i++)); do
+        local shard=()
+        for ((k = i; k < n; k += jobs)); do shard+=("${names[k]}"); done
+        unshare --user --map-current-user --net -- \
+            bash -c 'ip link set lo up 2> /dev/null; exec "$@"' harness \
+            timeout 7200 "$LL_PY" -I -B "$T/harness.py" --suite "$suite" --sysroot "$S" --build "$B" \
+            --fakes "$F" --expected "$T/expected" "${shard[@]}" > "$dir/$i.out" 2>&1 &
+        pids+=($!)
+    done
+    for ((i = 0; i < jobs; i++)); do
+        wait "${pids[i]}" || rc=1
+        cat "$dir/$i.out"
+    done
+    rm -rf "$dir"
+    return $rc
+}
+
 # harness SUITE NAME...
 harness() {
     local suite=$1; shift
@@ -113,9 +150,9 @@ else
     section "app server tests" app_server_tests
     section "sysroot" make_sysroot
     # shellcheck disable=SC2086
-    section "behaviour scenarios (qemu-user)" harness scenarios $SCENARIOS
+    section "behaviour scenarios (qemu-user)" harness_shards scenarios $SCENARIOS
     # shellcheck disable=SC2086
-    section "aggressive tests (qemu-user)" harness aggressive $AGGRESSIVE
+    section "aggressive tests (qemu-user)" harness_shards aggressive $AGGRESSIVE
     if [ ${#RECORD[@]} = 0 ]; then
         section "libmpd retries on EINTR" bash "$LL_ROOT/system/tests/libmpd-eintr.sh"
         section "mpd-karotz" bash "$LL_ROOT/system/tests/mpd-karotz.sh"
