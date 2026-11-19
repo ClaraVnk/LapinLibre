@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT
 # The start, run once by init: the time zone, cron, the Wi-Fi (network.sh), then the services
 # (/etc/init.d/S??*), the clock and the ready signal. The nose pulses cyan while it waits for the
-# Wi-Fi and the clock. Without a network the nose turns solid red and the Wi-Fi is retried in the background until
-# it comes up; the services start then. init's other lines (SSH, telnet, power) don't wait for it.
+# Wi-Fi and the clock. Without a network the nose turns solid red, the setup network opens for ten
+# minutes (hotspot.sh), then the Wi-Fi is retried in the background until it comes up; the services
+# start then. init's other lines (SSH, telnet, power) don't wait for it.
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/karotz/bin:/usr/karotz/bin
 export PATH
 LED=/karotz/bin/led
@@ -107,6 +108,9 @@ else
     nose_red
     log "no network"
     (
+        # The setup network first (hotspot.sh): settings given there reboot the rabbit onto them.
+        /karotz/scripts/hotspot.sh 600 && exit 0
+        nose_red
         while :; do
             sleep $RETRY_EVERY
             nose_waiting
