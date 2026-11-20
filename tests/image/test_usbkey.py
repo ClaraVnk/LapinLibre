@@ -261,6 +261,18 @@ class UsbKeyTest(unittest.TestCase):
         self.assertEqual((conf / "telnet").read_text(), "yes\n")
         self.assertNotIn("pa ss word", r.setuplog(), "the Wi-Fi password must not be logged")
 
+    def test_the_install_speaks_the_keys_language(self):
+        # LANGUAGE=fr-FR in lapinlibre.txt: the spoken prompts are the French ones (sound/fr), from
+        # the first one, before the settings are applied; without it, English.
+        for settings, lang in (("WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\nLANGUAGE=fr-FR\n", "fr"),
+                               ("WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n", None)):
+            r = self.rabbit(f"speaks-{lang}", settings=settings)
+            r.boot()
+            played = (r.sb / "tmp" / "install-start.mp3").read_bytes()
+            want = self.key / "sound" / ("fr/install-start.mp3" if lang else "install-start.mp3")
+            self.assertEqual(played, want.read_bytes(), lang)
+        self.assertTrue((self.key / "sound/fr/checks-start.mp3").is_file(), "the key has no French prompts")
+
     def test_blank_settings_keep_the_rabbits(self):
         # An update with an empty lapinlibre.txt keeps the rabbit's Wi-Fi, address,
         # SSH key and telnet choice (all in /usr/etc/conf, which installs keep).
