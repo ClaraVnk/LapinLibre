@@ -1,12 +1,12 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
 # The setup network, for startup.sh while the rabbit has no network:
-#   hotspot.sh press      waits for a long press of the head (3 s), then asks for the setup network
+#   hotspot.sh press      waits for three presses of the head within 3 s, then asks for the setup network
 #                         (the start-up's retry loop opens it: $RUN/wanted)
 #   hotspot.sh [SECONDS]  opens it (default 600 s)
 # The rabbit becomes the open access point "Karotz-XXXX" (the last four hex digits of its MAC), as
 # a smart plug's setup network is (Clara, 2026-11-19). Open: what is typed on the page crosses the
-# air in the clear, so it opens only on a press of the head -- whoever opens it has the rabbit in
+# air in the clear, so it opens only on presses of the head -- whoever opens it has the rabbit in
 # hand -- and closes as soon as the rabbit is set up, or after SECONDS. The nose pulses purple. A
 # phone that joins gets an address (udhcpd) and the setup page, http://192.168.75.1/setup.html,
 # which hands the Wi-Fi settings over (cgi-bin/wifi_setup, as the user web, into $RUN/in); this
@@ -33,18 +33,44 @@ stop() {
     rm -rf $RUN/active $RUN/wpa.conf $RUN/udhcpd.conf $RUN/in
 }
 
-# press: a long press of the head (held 3 s or more), then $RUN/wanted. /dev/rabbit_button gives
-# '1' on a press and anything else on its release (userland button-daemon.c); the daemons that
-# read it run only once the network is up, so it is free while this waits.
+# press: three presses of the head within 3 s, then $RUN/wanted. Not a long press: on a Karotz,
+# holding the head is the power gesture (/dev/rabbit_power '0', and power reboots the rabbit), which
+# a 4 s and a 10 s press did on Gengar (2026-11-20). /dev/rabbit_button gives '1' on a press and
+# anything else on its release, with the contact's bounces (userland button-daemon.c waits 50 ms
+# for a level); the daemons that read it run only once the network is up, so it is free while this
+# waits.
+
+# Time in hundredths of a second since boot: the head's presses are timed finer than date's seconds.
+cs() {
+    local u
+    read -r u _ < /proc/uptime
+    u="${u%.*}${u#*.}"
+    echo "${u#"${u%%[!0]*}"}"     # no leading zero: ash reads 08 as octal
+}
+PRESS_MIN=2           # cs a press must last: a quick tap is 8 to 13 cs (Gengar, 2026-11-20)
+PRESSES_WITHIN=300    # cs from the first of the three presses to the third
+
 press() {
     mkdir -p $RUN
+    n=0
+    first=0
+    up=0
     while :; do
         b=$(dd if=$BUTTON bs=1 count=1 2> /dev/null) || { sleep 5; continue; }
-        [ "$b" = 1 ] || continue
-        down=$(date +%s)
-        dd if=$BUTTON bs=1 count=1 > /dev/null 2>&1
-        if [ $(($(date +%s) - down)) -ge 3 ]; then
-            log "long press: the setup network is asked for"
+        t=$(cs)
+        if [ "$b" = 1 ]; then
+            up=$t
+            continue
+        fi
+        # A release: a press counts when the head stayed down PRESS_MIN cs or more; the contact's
+        # bounces, a few ms each, do not.
+        [ "$up" -gt 0 ] && [ $((t - up)) -ge $PRESS_MIN ] || { up=0; continue; }
+        [ $n -gt 0 ] && [ $((up - first)) -le $PRESSES_WITHIN ] || { n=0; first=$up; }
+        up=0
+        n=$((n + 1))
+        if [ $n -ge 3 ]; then
+            n=0
+            log "three presses: the setup network is asked for"
             : > $RUN/wanted
             killall led 2> /dev/null
             $LED -l 8000FF -p 000000 -d 200 &
