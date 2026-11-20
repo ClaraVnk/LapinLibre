@@ -479,12 +479,15 @@ static gboolean server_incoming(GSocketService *service, GSocketConnection *conn
     return TRUE;
 }
 
-/* Listens on any address once started (when the network goes online). */
+/* Listens on the loopback once started (when the network goes online): its clients are the
+ * rabbit's own applications (karotzVM connects to 127.0.0.1), and on any address it took
+ * connections from the whole network, with no password, for whoever asked to drive the rabbit
+ * (a port audit on a real rabbit, 2026-11-20). */
 GSocketService *platform_bind_server(int port)
 {
     g_log(NULL, G_LOG_LEVEL_DEBUG, "Bind server %d", port);
     GSocketService *service = g_socket_service_new();
-    GInetAddress *any = g_inet_address_new_any(G_SOCKET_FAMILY_IPV4);
+    GInetAddress *any = g_inet_address_new_loopback(G_SOCKET_FAMILY_IPV4);
     GSocketAddress *address = g_inet_socket_address_new(any, port & 0xffff);
     g_socket_listener_add_address(G_SOCKET_LISTENER(service), address, G_SOCKET_TYPE_STREAM, G_SOCKET_PROTOCOL_TCP,
                                   NULL, NULL, NULL);
