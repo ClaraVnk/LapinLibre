@@ -92,7 +92,7 @@ make_sysroot() {
     echo "PASS  sysroot $S ($(readlink "$S/usr/lib/libglib-2.0.so.0"), $(readlink "$S/lib/ld-uClibc.so.1"))"
 }
 
-# LL_TEST_JOBS (default: two per core): the behaviour scenarios and the aggressive tests run in that
+# LL_TEST_JOBS (default: one per core; two per core made memory and timing checks fail, 2026-11-20): the behaviour scenarios and the aggressive tests run in that
 # many shards at once. Each test checks itself (a scenario against its own record), so they are
 # independent; each shard has its own network namespace, as some listen on fixed ports (9123, 8088,
 # 6600). They wait mostly on real time, which is why the whole run took 65 minutes in a row on four
@@ -101,7 +101,7 @@ make_sysroot() {
 # least-loaded shard, from the durations the last run wrote ($F/durations; 30 s when unknown).
 # SERIAL run first and alone: their timings break under load (presses measured in milliseconds).
 # --record: one at a time.
-JOBS=${LL_TEST_JOBS:-$(( $(nproc 2> /dev/null || echo 1) * 2 ))}
+JOBS=${LL_TEST_JOBS:-$(nproc 2> /dev/null || echo 1)}
 # karotzVM and multimedia_daemon compare their whole record, whose order shifted under load
 # (2026-11-20: a reply before an LED line). Not karotzvm_reply_ends, alone it held the run 17 minutes.
 SERIAL="button_bounce button_empty_reads karotzVM multimedia_daemon"
