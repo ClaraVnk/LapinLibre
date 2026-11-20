@@ -184,6 +184,25 @@ def ca_certificates(changes):
     return out
 
 
+def terrier_client():
+    """Terrier OS: the Le Terrier client and its runner from the pinned release zip, as
+    usr/karotz/terrier/ (S50terrier copies them to the client's own folder in /usr/etc/conf, which
+    installs keep, and the Terrier's signed updates move them on from there)."""
+    import zipfile
+    r = subprocess.run([sys.executable, "-I", "-B", str(ROOT / "scripts" / "fetch.py"), "terrier-karotz"],
+                       capture_output=True, text=True, timeout=900)
+    if r.returncode != 0:
+        raise ImageError(f"fetching the Terrier client failed: {r.stderr.strip()[-500:]}")
+    out = {}
+    with zipfile.ZipFile(r.stdout.strip()) as z:
+        names = {Path(n).name: n for n in z.namelist() if not n.endswith("/")}
+        for name in ("terrier-karotz", "run.sh"):
+            if name not in names:
+                raise ImageError(f"the Terrier client's zip has no {name}")
+            out[f"karotz/terrier/{name}"] = z.read(names[name])
+    return out
+
+
 def core_generated(changes):
     """{(part, path): data} of the files system/core-files.txt marks generated. The core's inetd.conf
     serves the rabbit's web page (BusyBox httpd on port 80 as the user web, IPv4, at most 60 connections a minute)
@@ -202,6 +221,8 @@ def core_generated(changes):
            ("rootfs", "lib/firmware/LICENCE.ralink-firmware.txt"): licence.read_bytes(),
            ("usr", "etc/timezone.list"): timezone_list(changes)}
     for path, data in ca_certificates(changes).items():
+        out[("usr", path)] = data
+    for path, data in terrier_client().items():
         out[("usr", path)] = data
     for name, notes in SOUNDS.items():
         out[("usr", f"karotz/sounds/{name}")] = tone_wav(notes)

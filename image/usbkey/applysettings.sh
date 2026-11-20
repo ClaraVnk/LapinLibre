@@ -19,7 +19,7 @@ CONF=/usr/etc/conf
 BOM=$(printf '\357\273\277')
 
 WIFI_SSID= WIFI_PASSWORD= IP= NETMASK= GATEWAY= DNS= SSH_PUBKEY= TELNET= WEB_PASSWORD= MPD_PASSWORD=
-SERVER= TTS_SERVER= ASR_SERVER= LANGUAGE= HOSTNAME=
+SERVER= TTS_SERVER= ASR_SERVER= LANGUAGE= HOSTNAME= TERRIER=
 problems=""
 problem() { problems="${problems}${problems:+; }$1"; }
 
@@ -40,7 +40,7 @@ if [ -f "${FILE}" ]; then
         value="${value#"${value%%[![:space:]]*}"}"
         case "${value}" in \"*\") value=${value#\"}; value=${value%\"} ;; \'*\') value=${value#\'}; value=${value%\'} ;; esac
         case "${key}" in
-        WIFI_SSID|WIFI_PASSWORD|IP|NETMASK|GATEWAY|DNS|SSH_PUBKEY|TELNET|WEB_PASSWORD|MPD_PASSWORD|SERVER|TTS_SERVER|ASR_SERVER|LANGUAGE|HOSTNAME)
+        WIFI_SSID|WIFI_PASSWORD|IP|NETMASK|GATEWAY|DNS|SSH_PUBKEY|TELNET|WEB_PASSWORD|MPD_PASSWORD|SERVER|TTS_SERVER|ASR_SERVER|LANGUAGE|HOSTNAME|TERRIER)
             printf -v "${key}" '%s' "${value}" ;;
         *) problem "line ${n}: unknown setting ${key}" ;;
         esac
@@ -104,6 +104,9 @@ web_password_ok() {
 # recognition when those run elsewhere.
 is_host() { [[ "$1" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]]; }
 [ -z "${SERVER}" ] || is_host "${SERVER}" || problem "SERVER must be a host name or address, like 192.168.1.10"
+# Terrier OS: the Terrier the built-in client joins (S50terrier), or off.
+[ -z "${TERRIER}" ] || [ "${TERRIER}" = off ] || is_host "${TERRIER}" ||
+    problem "TERRIER must be a Terrier's host name, like terrier.cyberloutre.fr, or off"
 [ -z "${TTS_SERVER}" ] || [[ "${TTS_SERVER}" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._/-]*)?$ ]] ||
     problem "TTS_SERVER must be a URL like http://192.168.1.10:8081"
 [ -z "${ASR_SERVER}" ] || [[ "${ASR_SERVER}" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?$ ]] ||
@@ -137,6 +140,15 @@ if [ -n "${TELNET}" ]; then
     echo "${TELNET}" > "${CONF}/telnet"
     LOG "Settings: telnet ${TELNET}"
 fi
+# Terrier OS: a rabbit with the built-in client gets a web password even when none is given -- its
+# web API moves the ears, the camera and the speaker for anyone on the network otherwise. Drawn
+# here, given to the client, and written on the key (web-password.txt) for the owner to read.
+TERRIER_DIR=${CONF}/terrier
+WEB_PASSWORD_DRAWN=
+if [ -n "${TERRIER}" ] && [ "${TERRIER}" != off ] && [ -z "${WEB_PASSWORD}" ]; then
+    WEB_PASSWORD=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+    WEB_PASSWORD_DRAWN=1
+fi
 # The web password as given; the rabbit hashes it at its next start (inetd.sh) and removes this.
 # None given: no password, so any earlier one goes.
 if [ -n "${WEB_PASSWORD}" ]; then
@@ -157,6 +169,22 @@ if [ -n "${MPD_PASSWORD}" ]; then
 else
     rm -f "${CONF}/mpd_password"
     LOG "Settings: music player for the rabbit only"
+fi
+
+# Terrier OS: the built-in client's settings (run.sh sources them), next to its adoption key in
+# /usr/etc/conf/terrier; off stops it at the next start. Empty keeps the rabbit's.
+if [ "${TERRIER}" = off ]; then
+    rm -f "${TERRIER_DIR}/settings"
+    LOG "Settings: no Terrier client"
+elif [ -n "${TERRIER}" ]; then
+    mkdir -p "${TERRIER_DIR}" && chmod 700 "${TERRIER_DIR}" &&
+        (umask 077 && printf "SERVER=%s\nEXTRA='--ok http://admin:%s@127.0.0.1'\n" "${TERRIER}" "${WEB_PASSWORD}" \
+            > "${TERRIER_DIR}/settings") || ERROR "can't write the Terrier client's settings"
+    LOG "Settings: Terrier ${TERRIER}"
+    if [ -n "${WEB_PASSWORD_DRAWN}" ]; then
+        printf 'The web page password of this rabbit (user admin): %s\r\n' "${WEB_PASSWORD}" \
+            > /mnt/usbkey/web-password.txt 2> /dev/null || LOG "Settings: the web password could not be written on the key"
+    fi
 fi
 
 # KEY=VALUE in [SECTION] of an ini file, replacing the key's line or adding it (and the section).

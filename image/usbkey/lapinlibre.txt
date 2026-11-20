@@ -50,3 +50,7 @@ LANGUAGE=
 # ssh karotz@lapinlibre.local). Lower-case letters, digits and dashes; give each rabbit its own.
 # Empty keeps the rabbit's (lapinlibre unless an earlier install set one).
 HOSTNAME=
+# Terrier OS: the Terrier the rabbit joins with its built-in client (https://terrier.cyberloutre.fr).
+# off: no client. Without WEB_PASSWORD, the install draws one and writes it on this key
+# (web-password.txt). Empty keeps the rabbit's.
+TERRIER=terrier.cyberloutre.fr

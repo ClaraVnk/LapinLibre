@@ -314,6 +314,37 @@ class UsbKeyTest(unittest.TestCase):
             self.assertEqual(played, want.read_bytes(), lang)
         self.assertTrue((self.key / "sound/fr/checks-start.mp3").is_file(), "the key has no French prompts")
 
+    def test_terrier_os_sets_up_its_client(self):
+        # TERRIER= names the Terrier the built-in client joins (S50terrier). Without WEB_PASSWORD the
+        # install draws one, gives it to the client and writes it on the key for the owner.
+        r = self.rabbit("terrier", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\nTERRIER=terrier.example.com\n")
+        r.boot()
+        conf = r.sb / "usr/etc/conf"
+        settings = (conf / "terrier/settings").read_text()
+        self.assertIn("SERVER=terrier.example.com\n", settings)
+        drawn = (conf / "web_password").read_text().strip()
+        self.assertRegex(drawn, r"^[0-9a-f]{32}$")
+        self.assertIn(f"--ok http://admin:{drawn}@127.0.0.1", settings)
+        self.assertIn(drawn, (r.sb / "mnt/usbkey/web-password.txt").read_text())
+        self.assertNotIn(drawn, r.setuplog(), "the web password must not be logged")
+        self.assertEqual(oct((conf / "terrier").stat().st_mode & 0o777), "0o700")
+        # A password given is the one the client gets, and nothing is written on the key.
+        r = self.rabbit("terrier-given", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n"
+                                                  "TERRIER=terrier.example.com\nWEB_PASSWORD=givenpass9\n")
+        r.boot()
+        self.assertIn("admin:givenpass9@", (r.sb / "usr/etc/conf/terrier/settings").read_text())
+        self.assertFalse((r.sb / "mnt/usbkey/web-password.txt").exists())
+
+    def test_terrier_off_and_a_bad_terrier(self):
+        r = self.rabbit("terrier-off", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\nTERRIER=off\n")
+        (r.sb / "usr/etc/conf/terrier").mkdir(parents=True)
+        (r.sb / "usr/etc/conf/terrier/settings").write_text("SERVER=old.example.com\n")
+        r.boot()
+        self.assertFalse((r.sb / "usr/etc/conf/terrier/settings").exists())
+        r = self.rabbit("terrier-bad", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\nTERRIER=not a host\n")
+        r.boot()
+        self.assert_untouched(r)
+
     def test_blank_settings_keep_the_rabbits(self):
         # An update with an empty lapinlibre.txt keeps the rabbit's Wi-Fi, address,
         # SSH key and telnet choice (all in /usr/etc/conf, which installs keep).

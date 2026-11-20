@@ -1,0 +1,28 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Terrier OS: the Le Terrier client (ClaraVnk/nabaztag karotz releases), for startup.sh after S40.
+# It runs when the install wrote its settings (lapinlibre.txt's TERRIER=, applysettings.sh), from
+# its own folder in /usr/etc/conf, which installs keep: the rabbit's adoption key lives there, and
+# the client's signed updates replace its binary there. The image's copy (/usr/karotz/terrier) is
+# put there the first time only, so a newer client the Terrier sent is not taken back by a reinstall.
+DIR=/usr/etc/conf/terrier
+SHIPPED=/usr/karotz/terrier
+
+case "${1:-}" in
+    stop)
+        [ -x "$DIR/run.sh" ] && DIR=$DIR "$DIR/run.sh" stop
+        exit 0 ;;
+    start|"") ;;
+    *) echo "usage: $0 start|stop" >&2; exit 1 ;;
+esac
+
+[ -f "$DIR/settings" ] || exit 0          # no TERRIER=: the rabbit is not a Terrier rabbit
+grep -q '^SERVER=.' "$DIR/settings" || exit 0
+for f in terrier-karotz run.sh; do
+    if [ ! -x "$DIR/$f" ] && [ -f "$SHIPPED/$f" ]; then
+        cp "$SHIPPED/$f" "$DIR/$f.new" && chmod 755 "$DIR/$f.new" && mv -f "$DIR/$f.new" "$DIR/$f"
+    fi
+done
+[ -x "$DIR/run.sh" ] && [ -x "$DIR/terrier-karotz" ] || exit 0
+DIR=$DIR "$DIR/run.sh" start
+exit 0

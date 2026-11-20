@@ -390,6 +390,9 @@ usr:etc/mpd d 0755 0:0
 usr:etc/mpd/playlists d 0755 0:0
 usr:install d 0755 0:0
 usr:karotz d 0755 0:0
+usr:karotz/terrier d 0755 0:0  # Terrier OS: the Le Terrier client as the image ships it
+usr:karotz/terrier/terrier-karotz f 0755 0:0 generated
+usr:karotz/terrier/run.sh f 0755 0:0 generated
 usr:karotz/apps d 0755 0:0
 usr:karotz/bin d 0755 0:0
 usr:karotz/bin/button-daemon f 0755 0:0 own
@@ -1310,6 +1313,7 @@ rootfs:lib/firmware/LICENCE.ralink-firmware.txt f 0644 0:0 generated  # its lice
 # --- /usr ---
 usr:etc/init.d/S30dbus-daemon f 0755 0:0 target:etc/init.d/S30dbus-daemon  # Buildroot's D-Bus start
 usr:etc/init.d/S40lapinlibre f 0755 0:0 core  # uuid.conf, the playsounds default, the daemons, the button watcher, the controller and mdnsd
+usr:etc/init.d/S50terrier f 0755 0:0 core  # Terrier OS: the Le Terrier client, when lapinlibre.txt's TERRIER= names a Terrier
 usr:etc/usbkey.d d 0755 0:0
 usr:etc/usbkey.d/50mpd f 0755 0:0 core  # mpd rescans the stick's music
 usr:scripts/dbus_watcher f 0755 0:0 core  # the head button's tones and its /etc/button.d hooks, under immortaldog

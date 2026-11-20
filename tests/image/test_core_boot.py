@@ -9,6 +9,7 @@ Needs the network (or the download cache) for the pinned RT73 firmware.
 
 import contextlib
 import io
+import os
 import shutil
 import subprocess
 import sys
@@ -830,3 +831,53 @@ class S40Test(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+S50 = ROOT / "image/core/usr/etc/init.d/S50terrier"
+
+
+class S50Test(unittest.TestCase):
+    """Terrier OS's S50terrier in a sandbox: the client's folder in /usr/etc/conf, the image's copy
+    in /usr/karotz/terrier, and a run.sh that records how it is started."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        sb = self.sb = Path(self.tmp.name)
+        self.conf = sb / "usr/etc/conf/terrier"
+        self.shipped = sb / "usr/karotz/terrier"
+        self.shipped.mkdir(parents=True)
+        self.log = sb / "actions.log"
+        (self.shipped / "terrier-karotz").write_text("shipped client\n")
+        (self.shipped / "run.sh").write_text(f'#!/bin/sh\necho "run.sh $1 DIR=$DIR" >> {self.log}\n')
+        script = S50.read_text(encoding="utf-8").replace("/usr/", f"{sb}/usr/")
+        self.script = sb / "S50terrier"
+        self.script.write_text(script, newline="\n")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_s50(self, action="start"):
+        r = subprocess.run(["sh", str(self.script), action], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return self.log.read_text() if self.log.exists() else ""
+
+    def test_no_terrier_set_starts_nothing(self):
+        self.assertEqual(self.run_s50(), "")
+        self.assertFalse((self.conf / "terrier-karotz").exists())
+
+    def test_the_first_start_takes_the_images_client(self):
+        self.conf.mkdir(parents=True)
+        (self.conf / "settings").write_text("SERVER=terrier.example.com\n")
+        self.assertEqual(self.run_s50(), f"run.sh start DIR={self.conf}\n")
+        self.assertEqual((self.conf / "terrier-karotz").read_text(), "shipped client\n")
+        self.assertTrue(os.access(self.conf / "terrier-karotz", os.X_OK))
+
+    def test_a_newer_client_is_not_taken_back(self):
+        # The Terrier's signed update replaced the binary in the client's folder: a reinstall's
+        # older copy in the image must not overwrite it.
+        self.conf.mkdir(parents=True)
+        (self.conf / "settings").write_text("SERVER=terrier.example.com\n")
+        (self.conf / "terrier-karotz").write_text("updated client\n")
+        (self.conf / "terrier-karotz").chmod(0o755)
+        self.run_s50()
+        self.assertEqual((self.conf / "terrier-karotz").read_text(), "updated client\n")
