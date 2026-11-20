@@ -5,7 +5,7 @@
 # rabbit's settings: it leaves them in the setup network's drop folder (owned by web, made by
 # hotspot.sh), which checks them again, writes them as the key's install does and reboots.
 . /usr/share/lapinlibre/web.sh
-web_begin change
+web_begin setup
 IN=/var/run/hotspot/in
 [ -f /var/run/hotspot/active ] && [ -d $IN ] || web_refuse 403 "the setup network isn't open"
 [ "$REQUEST_METHOD" = POST ] || web_refuse 405 "send the settings with POST"

@@ -147,6 +147,7 @@ TERRIER_DIR=${CONF}/terrier
 WEB_PASSWORD_DRAWN=
 if [ -n "${TERRIER}" ] && [ "${TERRIER}" != off ] && [ -z "${WEB_PASSWORD}" ]; then
     WEB_PASSWORD=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+    [ ${#WEB_PASSWORD} -eq 32 ] || ERROR "can't draw a web password"
     WEB_PASSWORD_DRAWN=1
 fi
 # The web password as given; the rabbit hashes it at its next start (inetd.sh) and removes this.

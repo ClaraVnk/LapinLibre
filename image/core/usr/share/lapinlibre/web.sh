@@ -314,8 +314,15 @@ web_begin() {
     WEB_CLIENT=${REMOTE_ADDR:-}
     case $WEB_CLIENT in '' | *[!0-9.]*) WEB_CLIENT='?' ;; esac
     [ "${REQUEST_METHOD:-}" = HEAD ] && WEB_HEAD=1
-    # 1. With a web password, the web user, set by httpd after it has checked the password.
-    if [ -s "$WEB_HASH" ] && [ "${REMOTE_USER:-}" != "$WEB_USER" ]; then
+    # 1. With a web password, the web user, set by httpd after it has checked the password. The
+    # one exception is the setup network's page (kind setup, wifi_setup), while hotspot.sh holds
+    # it open: whoever opened it pressed the rabbit's head, and doesn't know the drawn password.
+    _open=""
+    if [ "$WEB_KIND" = setup ]; then
+        WEB_KIND=change
+        [ -f /var/run/hotspot/active ] && _open=1
+    fi
+    if [ -z "$_open" ] && [ -s "$WEB_HASH" ] && [ "${REMOTE_USER:-}" != "$WEB_USER" ]; then
         web_refuse 403 "the request isn't authenticated as the web user"
     fi
     # 2. A client on the local network.

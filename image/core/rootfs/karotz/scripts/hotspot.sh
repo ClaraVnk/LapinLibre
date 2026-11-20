@@ -20,6 +20,15 @@ LIMIT=${1:-600}
 ADDR=192.168.75.1
 LED=/karotz/bin/led
 BUTTON=/dev/rabbit_button
+HTTPD_CONF=/var/run/httpd.conf
+# The names phones check for Internet on a new network (Apple, Android, Windows, Firefox, GNOME,
+# Debian). The rabbit answers them with itself and serves the setup page for any path, so the
+# check fails the captive way and the phone opens the page by itself: without it Chrome on iOS
+# refused the network ("Internet déconnecté") and the owner had to type the address (Gengar,
+# 2026-11-20). Any other name gets no answer.
+PROBES="captive.apple.com www.apple.com connectivitycheck.gstatic.com connectivitycheck.android.com
+clients3.google.com www.google.com www.msftconnecttest.com www.msftncsi.com detectportal.firefox.com
+nmcheck.gnome.org network-test.debian.org"
 
 log() {
     echo "hotspot: $*"
@@ -28,6 +37,8 @@ log() {
 
 stop() {
     [ -f $RUN/udhcpd.pid ] && kill "$(cat $RUN/udhcpd.pid)" 2> /dev/null
+    killall dnsd 2> /dev/null
+    [ -f $RUN/httpd.conf.saved ] && mv -f $RUN/httpd.conf.saved $HTTPD_CONF
     [ -f $RUN/wpa.pid ] && kill "$(cat $RUN/wpa.pid)" 2> /dev/null
     ifconfig wlan0 0.0.0.0 2> /dev/null
     rm -rf $RUN/active $RUN/wpa.conf $RUN/udhcpd.conf $RUN/in
@@ -106,9 +117,22 @@ mkdir -p $RUN
     umask 077
     printf 'ap_scan=2\nnetwork={\nssid="Karotz-%s"\nmode=2\nfrequency=2437\nkey_mgmt=NONE\n}\n' \
         "$suffix" > $RUN/wpa.conf
-    printf 'start 192.168.75.10\nend 192.168.75.40\ninterface wlan0\nmax_leases 8\nlease_file %s/leases\npidfile %s/udhcpd.pid\nopt subnet 255.255.255.0\nopt lease 600\n' \
-        "$RUN" "$RUN" > $RUN/udhcpd.conf
+    printf 'start 192.168.75.10\nend 192.168.75.40\ninterface wlan0\nmax_leases 8\nlease_file %s/leases\npidfile %s/udhcpd.pid\nopt subnet 255.255.255.0\nopt lease 600\nopt router %s\nopt dns %s\n' \
+        "$RUN" "$RUN" "$ADDR" "$ADDR" > $RUN/udhcpd.conf
+    for name in $PROBES; do echo "$name $ADDR"; done > $RUN/dnsd.conf
 )
+# The web server's rules while the setup network is open: its clients only, no login (the owner
+# doesn't know the web password Terrier OS drew), the setup page for / and for any missing path.
+# Only wifi_setup takes a request without the login, and only while the network is open (web.sh);
+# every other CGI still refuses. stop() puts the rules back.
+if [ -f $HTTPD_CONF ] && [ ! -f $RUN/httpd.conf.saved ]; then
+    cp -p $HTTPD_CONF $RUN/httpd.conf.saved || { log "the web server's rules couldn't be kept"; exit 1; }
+fi
+(
+    umask 077
+    printf '# The setup network'"'"'s rules (hotspot.sh).\nA:192.168.75.0/24\nD:*\nI:setup.html\nE404:/setup.html\n' > $HTTPD_CONF.new
+) && chgrp web $HTTPD_CONF.new && chmod 640 $HTTPD_CONF.new && mv -f $HTTPD_CONF.new $HTTPD_CONF ||
+    { log "the web server's rules couldn't be written"; stop; exit 1; }
 rm -f $RUN/saved $RUN/wanted
 rm -rf $RUN/in
 mkdir -p $RUN/in && chown web $RUN/in && chmod 700 $RUN/in || { log "no drop folder for the web user"; exit 1; }
@@ -123,6 +147,7 @@ if ! wpa_supplicant -iwlan0 -Dnl80211 -B -P$RUN/wpa.pid -c$RUN/wpa.conf; then
 fi
 # busybox's own: the image links udhcpc, not udhcpd (a phone got no address, Gengar, 2026-11-20).
 busybox udhcpd $RUN/udhcpd.conf
+busybox dnsd -c $RUN/dnsd.conf -i $ADDR -t 60 -d
 : > $RUN/active
 log "Karotz-$suffix open for ${LIMIT} s: http://$ADDR/setup.html"
 killall led 2> /dev/null

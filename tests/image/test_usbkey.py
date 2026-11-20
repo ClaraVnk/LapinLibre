@@ -81,6 +81,9 @@ class Rabbit:
         stub(sb / "bin/madplay-log", f'echo "play $(basename "$1")" >> {log}')
 
         (sb / "dev").mkdir()
+        # The rewrite sends /dev/urandom here too: random bytes, as the rabbit's (the drawn web
+        # password reads it).
+        (sb / "dev" / "urandom").write_bytes(os.urandom(4096))
         for mtd in ("mtd1", "mtd2"):
             (sb / "dev" / mtd).write_bytes(b"old " + mtd.encode())
         (sb / "proc").mkdir()
