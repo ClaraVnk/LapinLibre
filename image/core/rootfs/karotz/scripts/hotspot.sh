@@ -3,6 +3,7 @@
 # The setup network, for startup.sh while the rabbit has no network:
 #   hotspot.sh press      waits for three presses of the head within 3 s, then asks for the setup network
 #                         (the start-up's retry loop opens it: $RUN/wanted)
+#   hotspot.sh watch      once the network is up: a triple click of the head opens it too
 #   hotspot.sh [SECONDS]  opens it (default 600 s)
 # The rabbit becomes the open access point "Karotz-XXXX" (the last four hex digits of its MAC), as
 # a smart plug's setup network is (Clara, 2026-11-19). Open: what is typed on the page crosses the
@@ -89,7 +90,24 @@ press() {
     done
 }
 
+# watch: once the network is up, a triple click of the head (button-daemon's tclick: three
+# presses under 300 ms apart) opens the setup network too, so a working rabbit can move to another
+# Wi-Fi without the USB key (Clara, 2026-11-20). Settings given there reboot it onto them; nobody in
+# 600 s, and it reboots onto the network it had.
+watch() {
+    dbus-monitor --system "type='signal',member='tclick'" 2> /dev/null | while read -r l; do
+        case $l in
+        *member=tclick*)
+            log "triple click: the setup network, over a working one"
+            "$0" 600 || { log "nobody set it up: back to the network it had"; setsid reboot < /dev/null > /dev/null 2>&1 & }
+            exit 0
+            ;;
+        esac
+    done
+}
+
 [ "$1" = press ] && { press; exit 0; }
+[ "$1" = watch ] && { watch; exit 0; }
 
 # take: the settings the page handed over, checked again (the page's own rules), into
 # /usr/etc/conf as applysettings.sh writes them (WPA2 and WPA3, an address from the router).

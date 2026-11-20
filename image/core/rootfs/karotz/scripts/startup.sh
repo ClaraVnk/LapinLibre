@@ -57,6 +57,8 @@ services() {
     for script in "$INITD"/S??*; do
         [ -x "$script" ] && "$script" start
     done
+    # A triple click of the head, from now on, opens the setup network (hotspot.sh watch).
+    /karotz/scripts/hotspot.sh watch > /dev/null 2>&1 &
     # led-daemon takes the nose from the led tool as soon as it owns its name (at most 30 s), so
     # the web API and the tag listener, which set the nose through led-daemon only, never meet the
     # tool. It goes on pulsing cyan while the clock is set.
