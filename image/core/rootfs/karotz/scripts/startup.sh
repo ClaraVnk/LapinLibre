@@ -3,7 +3,7 @@
 # The start, run once by init: the time zone, cron, the Wi-Fi (network.sh), then the services
 # (/etc/init.d/S??*), the clock and the ready signal. The nose pulses cyan while it waits for the
 # Wi-Fi and the clock. Without a network the nose turns solid red and the Wi-Fi is retried in the
-# background until it comes up; the services start then. Meanwhile a long press of the head opens
+# background until it comes up; the services start then. Meanwhile three presses of the head open
 # the setup network (hotspot.sh). init's other lines (SSH, telnet, power) don't wait for it.
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/karotz/bin:/usr/karotz/bin
 export PATH
@@ -108,7 +108,7 @@ else
     nose_red
     log "no network"
     (
-        # A long press of the head asks for the setup network (hotspot.sh): it opens between two
+        # Three presses of the head ask for the setup network (hotspot.sh): it opens between two
         # tries, and settings given there reboot the rabbit onto them.
         /karotz/scripts/hotspot.sh press &
         watcher=$!
