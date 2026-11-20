@@ -213,6 +213,7 @@ rootfs:karotz/etc/profile f 0644 0:0
 rootfs:karotz/etc/rootfs_version f 0644 0:0
 rootfs:karotz/etc/shells f 0644 0:0
 rootfs:karotz/scripts d 0775 0:0
+rootfs:karotz/scripts/hotspot.sh f 0755 0:0
 rootfs:karotz/scripts/inetd.sh f 0755 0:0
 rootfs:karotz/scripts/network.sh f 0755 0:0
 rootfs:karotz/scripts/sshd.sh f 0755 0:0
@@ -331,6 +332,8 @@ rootfs:sbin/watchdog l 0777 0:0 -> ../bin/busybox
 rootfs:sys d 0755 0:0
 rootfs:tmp l 0777 0:0 -> var/tmp
 rootfs:usr d 0755 0:0
+rootfs:usr/sbin d 0755 0:0
+rootfs:usr/sbin/udhcpd l 0777 0:0 -> ../../bin/busybox
 rootfs:var d 0755 0:0
 rootfs:www l 0777 0:0 -> /usr/www
 usr:bin d 0755 0:0
@@ -401,6 +404,7 @@ usr:etc/dbus-1/system.d/karotz.conf f 0644 0:0
 usr:etc/init.d d 0755 0:0
 usr:etc/init.d/S30dbus-daemon f 0755 0:0
 usr:etc/init.d/S40lapinlibre f 0755 0:0
+usr:etc/init.d/S50terrier f 0755 0:0
 usr:etc/mdns.d d 0755 0:0
 usr:etc/mdns.d/ssh.service f 0644 0:0
 usr:etc/mpd d 0755 0:0
@@ -611,6 +615,9 @@ usr:karotz/sounds/shutter.wav f 0644 0:0
 usr:karotz/sounds/speech_server_timeout_en-GB.mp3 f 0644 0:0
 usr:karotz/sounds/speech_server_timeout_fr-FR.mp3 f 0644 0:0
 usr:karotz/sounds/wakeup.mp3 f 0644 0:0
+usr:karotz/terrier d 0755 0:0
+usr:karotz/terrier/run.sh f 0755 0:0
+usr:karotz/terrier/terrier-karotz f 0755 0:0
 usr:lib d 0755 0:0
 usr:lib/crda d 0755 0:0
 usr:lib/crda/regulatory.bin f 0644 0:0
@@ -1546,5 +1553,7 @@ usr:www/cgi-bin/tools_ps f 0755 0:0
 usr:www/cgi-bin/tts f 0755 0:0
 usr:www/cgi-bin/voice_list f 0755 0:0
 usr:www/cgi-bin/wakeup f 0755 0:0
+usr:www/cgi-bin/wifi_setup f 0755 0:0
 usr:www/index.html f 0644 0:0
+usr:www/setup.html f 0644 0:0
 usr:www/style.css f 0644 0:0
