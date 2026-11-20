@@ -102,9 +102,10 @@ make_sysroot() {
 # SERIAL run first and alone: their timings break under load (presses measured in milliseconds).
 # --record: one at a time.
 JOBS=${LL_TEST_JOBS:-$(nproc 2> /dev/null || echo 1)}
-# karotzVM and multimedia_daemon compare their whole record, whose order shifted under load
-# (2026-11-20: a reply before an LED line). Not karotzvm_reply_ends, alone it held the run 17 minutes.
-SERIAL="button_bounce button_empty_reads karotzVM multimedia_daemon"
+# multimedia_daemon compares its whole record, whose order shifted under load (2026-11-20). Not
+# karotzVM, whose order differs here even alone, nor karotzvm_reply_ends, alone it held the run 17
+# minutes: both measure karotzVM's speed under qemu-user, slow on a 4-core host.
+SERIAL="button_bounce button_empty_reads multimedia_daemon"
 DURATIONS=$F/durations
 
 # harness_pool SUITE:NAME...: every test, SERIAL first and alone, the rest in JOBS balanced shards;
