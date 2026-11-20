@@ -93,10 +93,10 @@ sha256 = "3f565be05f7f3d1aff117c030eb7c738300510b7d098cedea796ca8e4cd587af"
 
 [download.terrier-karotz]
 # Terrier OS: the Le Terrier client for the Karotz, built in for a rabbit set up with TERRIER= (its
-# release, signed with the Karotz key; ClaraVnk/nabaztag karotz-0.1.13).
+# release, signed with the Karotz key; ClaraVnk/nabaztag karotz-0.1.14).
 group = "image"
-urls = ["https://github.com/ClaraVnk/nabaztag/releases/download/karotz-0.1.13/terrier-karotz-0.1.13.zip"]
-sha256 = "f291e59728dd1eeeb9f7d81f326532c22474ecf85dec36b16c88b191876dd7df"
+urls = ["https://github.com/ClaraVnk/nabaztag/releases/download/karotz-0.1.14/terrier-karotz-0.1.14.zip"]
+sha256 = "2ccec710e1fb262da91db6cd0d9110229a73345d2f15a584836e572a902b9184"
 
 [download.tzdata]
 group = "image"
