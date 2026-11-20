@@ -319,6 +319,7 @@ rootfs:sbin/sysctl l ../bin/busybox
 rootfs:sbin/syslogd l ../bin/busybox
 rootfs:sbin/telnetd l /bin/busybox
 rootfs:sbin/udhcpc l ../bin/busybox
+rootfs:usr/sbin/udhcpd l ../../bin/busybox  # the setup network's DHCP server (hotspot.sh)
 rootfs:sbin/vconfig l ../bin/busybox
 rootfs:sbin/watchdog l ../bin/busybox
 rootfs:sys d 0755 0:0
