@@ -263,6 +263,45 @@ class UsbKeyTest(unittest.TestCase):
         self.assertEqual((conf / "telnet").read_text(), "yes\n")
         self.assertNotIn("pa ss word", r.setuplog(), "the Wi-Fi password must not be logged")
 
+    # network-config and user-data as Raspberry Pi Imager 2 writes them (init_format cloudinit,
+    # rpi-imager src/customization_generator.cpp, 2026-11-04).
+    IMAGER_NETWORK = ('network:\n  version: 2\n  ethernets:\n    eth0:\n      dhcp4: true\n'
+                      '      dhcp6: true\n      optional: true\n  wifis:\n    wlan0:\n      dhcp4: true\n'
+                      '      regulatory-domain: "FR"\n      access-points:\n        "my net":\n'
+                      '          password: "pa ss word"\n      optional: true\n')
+    IMAGER_USER = ('#cloud-config\nhostname: "kitchen-rabbit"\nmanage_etc_hosts: true\n'
+                   'user:\n  name: "pi"\n  shell: /bin/bash\n  lock_passwd: true\n'
+                   '  ssh_authorized_keys:\n    - "{key}"\n  sudo: ALL=(ALL) NOPASSWD:ALL\n'
+                   'timezone: "Europe/Paris"\n')
+
+    def imager_rabbit(self, name, settings):
+        r = self.rabbit(name, rootfs_version="11.03.10.00", settings=settings)
+        key = r.sb / "mnt/usbkey"
+        (key / "network-config").write_text(self.IMAGER_NETWORK, newline="\n")
+        (key / "user-data").write_text(self.IMAGER_USER.format(key=TEST_KEY), newline="\n")
+        (key / "meta-data").write_text("instance-id: rpi-imager-1\n", newline="\n")
+        return r
+
+    def test_settings_from_raspberry_pi_imager(self):
+        # The key written by Raspberry Pi Imager with its OS customisation, lapinlibre.txt
+        # untouched: the Wi-Fi network (in clear, so WPA3 too), the name and the SSH key land.
+        r = self.imager_rabbit("imager", settings="WIFI_SSID=\nWIFI_PASSWORD=\n")
+        r.boot()
+        self.assert_flashed(r, ssid="my net")
+        conf = r.sb / "usr/etc/conf"
+        wpa = (conf / "wpa.conf").read_text()
+        self.assertIn('ssid="my net"\npsk="pa ss word"', wpa)
+        self.assertIn("key_mgmt=WPA-PSK SAE", wpa)
+        self.assertEqual((conf / "hostname").read_text(), "kitchen-rabbit\n")
+        self.assertEqual((conf / "authorized_keys").read_text(), TEST_KEY + "\n")
+        self.assertNotIn("pa ss word", r.setuplog(), "the Wi-Fi password must not be logged")
+
+    def test_lapinlibre_txt_wins_over_imager(self):
+        r = self.imager_rabbit("imager-txt", settings="WIFI_SSID=other\nWIFI_PASSWORD=otherpass\nHOSTNAME=lapin\n")
+        r.boot()
+        self.assert_flashed(r, ssid="other")
+        self.assertEqual((r.sb / "usr/etc/conf/hostname").read_text(), "lapin\n")
+
     def test_blank_settings_keep_the_rabbits(self):
         # An update with an empty lapinlibre.txt keeps the rabbit's Wi-Fi, address,
         # SSH key and telnet choice (all in /usr/etc/conf, which installs keep).

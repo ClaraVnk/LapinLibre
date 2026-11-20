@@ -47,6 +47,26 @@ if [ -f "${FILE}" ]; then
     done < "${FILE}"
 fi
 
+# What Raspberry Pi Imager's OS customisation wrote on the key (the key's image lists
+# init_format cloudinit): network-config and user-data, in the fixed shape Imager writes
+# them (rpi-imager src/customization_generator.cpp). The Wi-Fi network, the name and the
+# first SSH key fill what lapinlibre.txt left empty; lapinlibre.txt wins. Imager keeps the
+# passphrase in clear (netplan's password:), so WPA3 still works. A value Imager had to
+# escape (a backslash) is refused like one in lapinlibre.txt.
+imager_value() { # the double-quoted value on the first line that starts with $1
+    sed -n "s/^$1\"\(.*\)\"[:]*$/\1/p" "$2" | head -n 1
+}
+NC=/mnt/usbkey/network-config UD=/mnt/usbkey/user-data
+if [ -z "${WIFI_SSID}${WIFI_PASSWORD}" ] && [ -f "${NC}" ]; then
+    WIFI_SSID=$(imager_value '        ' "${NC}")
+    WIFI_PASSWORD=$(imager_value '          password: ' "${NC}")
+    if [ -n "${WIFI_SSID}" ]; then LOG "Settings: Wi-Fi from Raspberry Pi Imager"; fi
+fi
+if [ -f "${UD}" ]; then
+    [ -n "${HOSTNAME}" ] || HOSTNAME=$(imager_value 'hostname: ' "${UD}")
+    [ -n "${SSH_PUBKEY}" ] || SSH_PUBKEY=$(sed -n '/^  ssh_authorized_keys:/,/^  [^ ]/s/^    - "\(.*\)"$/\1/p' "${UD}" | head -n 1)
+fi
+
 is_address() { [[ "$1" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; }
 
 # The Wi-Fi network: both or neither; the characters wpa_supplicant's quoted strings can hold.
