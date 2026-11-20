@@ -68,7 +68,7 @@ ll_source_epoch() {
 # the release's version.
 ll_input_commit() {
     [ "${LL_REUSE_UNCHANGED:-}" = 1 ] || return 0
-    git -C "$LL_ROOT" log -1 --format=%H -- "$@" 2>/dev/null || true
+    git -C "$LL_ROOT" log -1 --no-merges --format=%H -- "$@" 2>/dev/null || true
 }
 
 # Stamps: a stage's step is skipped when its stamp holds the same key (a hash
