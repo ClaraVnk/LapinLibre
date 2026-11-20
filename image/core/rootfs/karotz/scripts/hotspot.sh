@@ -121,7 +121,8 @@ if ! wpa_supplicant -iwlan0 -Dnl80211 -B -P$RUN/wpa.pid -c$RUN/wpa.conf; then
     stop
     exit 1
 fi
-udhcpd $RUN/udhcpd.conf
+# busybox's own: the image links udhcpc, not udhcpd (a phone got no address, Gengar, 2026-11-20).
+busybox udhcpd $RUN/udhcpd.conf
 : > $RUN/active
 log "Karotz-$suffix open for ${LIMIT} s: http://$ADDR/setup.html"
 killall led 2> /dev/null
