@@ -1,0 +1,20 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# wifi_networks (GET): the networks hotspot.sh saw before the radio became the setup network's
+# access point (wifiscan.sh), for the setup page to list, only while that network is open.
+# [{"ssid":"…","q":70,"sec":"WPA2"}, …], the strongest first. Names with a quote or a backslash
+# never get here (wifiscan.sh leaves them out: the page can't take them).
+. /usr/share/lapinlibre/web.sh
+web_begin setup
+[ -f /var/run/hotspot/active ] || web_refuse 403 "the setup network isn't open"
+out="["
+sep=""
+if [ -r /var/run/hotspot/networks ]; then
+    while IFS="$(printf '\t')" read -r q sec ssid; do
+        case "$q" in '' | *[!0-9]*) continue ;; esac
+        out="$out$sep{\"ssid\":\"$ssid\",\"q\":$q,\"sec\":\"$sec\"}"
+        sep=","
+    done < /var/run/hotspot/networks
+fi
+web_ok
+reply_json "$out]"

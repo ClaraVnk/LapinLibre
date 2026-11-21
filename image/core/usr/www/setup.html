@@ -13,13 +13,41 @@
 <h1>Karotz</h1>
 <p>Its Wi-Fi network / Son réseau Wi-Fi</p>
 <form id="f">
-<p><label>Network name / Nom du réseau<br><input name="ssid" maxlength="32" required autocomplete="off"></label></p>
+<div id="nets" hidden>
+<p>Networks around / Réseaux à portée</p>
+<ul id="list" style="list-style:none;padding:0;margin:0 0 1em"></ul>
+</div>
+<p><label>Network name / Nom du réseau<br><input name="ssid" id="ssid" maxlength="32" required autocomplete="off"></label></p>
 <p><label>Password / Mot de passe<br><input name="password" type="password" minlength="8" maxlength="63" required></label></p>
 <p><button>Save and restart / Enregistrer et redémarrer</button></p>
 </form>
 <p id="r" role="status"></p>
 </main>
 <script>
+// The networks the rabbit saw before it opened this one (hotspot.sh, wifiscan.sh), strongest
+// first: a tap fills the name, as on a Naboot rabbit's page. A hidden network is typed.
+fetch("/cgi-bin/wifi_networks").then(function (a) { return a.json(); }).then(function (nets) {
+  if (!nets.length) return;
+  var list = document.getElementById("list");
+  nets.forEach(function (n) {
+    var li = document.createElement("li");
+    var b = document.createElement("button");
+    b.type = "button";
+    b.style.cssText = "width:100%;text-align:left;margin:0 0 .4em;display:flex;justify-content:space-between";
+    var name = document.createElement("span");
+    name.textContent = n.ssid;
+    var info = document.createElement("span");
+    info.textContent = (n.q >= 67 ? "▂▄▆" : n.q >= 34 ? "▂▄" : "▂") + (n.sec === "open" ? "" : " 🔒");
+    if (n.sec === "open") { b.disabled = true; b.title = "open networks are not taken / réseau ouvert non pris en charge"; }
+    b.appendChild(name); b.appendChild(info);
+    b.addEventListener("click", function () {
+      document.getElementById("ssid").value = n.ssid;
+      document.querySelector("input[name=password]").focus();
+    });
+    li.appendChild(b); list.appendChild(li);
+  });
+  document.getElementById("nets").hidden = false;
+}).catch(function () {});
 document.getElementById("f").addEventListener("submit", function (e) {
   e.preventDefault();
   var r = document.getElementById("r");

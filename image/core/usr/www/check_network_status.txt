@@ -1,0 +1,9 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- A phone's "is there Internet?" check on the setup network (hotspot.sh): a 200 that is not the
+     answer it expects, so it opens this as a captive portal, which takes it to the setup page.
+     Apple, Android, Windows and Firefox each ask their own path; a 404 makes Android say "no
+     Internet" instead of opening the page (2026-11-21). -->
+<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=http://192.168.75.1/setup.html">
+<title>Karotz</title></head>
+<body><a href="http://192.168.75.1/setup.html">Karotz setup / Réglages du Karotz</a></body></html>

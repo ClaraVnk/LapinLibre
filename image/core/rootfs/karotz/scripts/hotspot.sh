@@ -27,22 +27,25 @@ HTTPD_CONF=/var/run/httpd.conf
 # check fails the captive way and the phone opens the page by itself: without it Chrome on iOS
 # refused the network ("Internet déconnecté") and the owner had to type the address (Gengar,
 # 2026-11-20). Any other name gets no answer.
-PROBES="captive.apple.com www.apple.com connectivitycheck.gstatic.com connectivitycheck.android.com
-clients3.google.com www.google.com www.msftconnecttest.com www.msftncsi.com detectportal.firefox.com
-nmcheck.gnome.org network-test.debian.org"
 
+# Also kept in /usr/etc/conf, which a reboot and an install keep: /var/log is in RAM, and the
+# reboot that follows the setup network took with it why a saved network was not the one
+# written (Gengar, 2026-11-21). The last 200 lines.
+LOGFILE=/usr/etc/conf/hotspot.log
 log() {
     echo "hotspot: $*"
     logger -t hotspot "$*" 2> /dev/null
+    { echo "$(date '+%F %T') $*" >> $LOGFILE && [ "$(wc -l < $LOGFILE)" -gt 400 ] &&
+        tail -n 200 $LOGFILE > $LOGFILE.new && mv -f $LOGFILE.new $LOGFILE; } 2> /dev/null
 }
 
 stop() {
     [ -f $RUN/udhcpd.pid ] && kill "$(cat $RUN/udhcpd.pid)" 2> /dev/null
-    killall dnsd 2> /dev/null
+    [ -f $RUN/dnsmasq.pid ] && kill "$(cat $RUN/dnsmasq.pid)" 2> /dev/null
     [ -f $RUN/httpd.conf.saved ] && mv -f $RUN/httpd.conf.saved $HTTPD_CONF
     [ -f $RUN/wpa.pid ] && kill "$(cat $RUN/wpa.pid)" 2> /dev/null
     ifconfig wlan0 0.0.0.0 2> /dev/null
-    rm -rf $RUN/active $RUN/wpa.conf $RUN/udhcpd.conf $RUN/in
+    rm -rf $RUN/active $RUN/wpa.conf $RUN/udhcpd.conf $RUN/in $RUN/networks
 }
 
 # press: three presses of the head within 3 s, then $RUN/wanted. Not a long press: on a Karotz,
@@ -117,8 +120,9 @@ take() {
     ssid=$(sed -n 1p $f)
     psk=$(sed -n 2p $f)
     rm -f $f
-    [ ${#ssid} -ge 1 ] && [ ${#ssid} -le 32 ] && [ ${#psk} -ge 8 ] && [ ${#psk} -le 63 ] || return 1
-    case "$ssid$psk" in *[\"\\]* | *[![:print:]]*) return 1 ;; esac
+    [ ${#ssid} -ge 1 ] && [ ${#ssid} -le 32 ] && [ ${#psk} -ge 8 ] && [ ${#psk} -le 63 ] ||
+        { log "settings refused: name ${#ssid} bytes, password ${#psk} (1-32, 8-63)"; return 1; }
+    case "$ssid$psk" in *[\"\\]* | *[![:print:]]*) log "settings refused: a quote, a backslash or a character it can't take"; return 1 ;; esac
     (umask 077 && printf 'network={\nssid="%s"\npsk="%s"\nkey_mgmt=WPA-PSK SAE\nieee80211w=1\nscan_ssid=1\nproto=WPA RSN\n}\n' \
         "$ssid" "$psk" > /usr/etc/conf/wpa.conf.new) && mv -f /usr/etc/conf/wpa.conf.new /usr/etc/conf/wpa.conf || return 1
     printf 'IP=""\nNETMASK=""\nGATEWAY=""\nDNS=""\n' > /usr/etc/conf/network.conf
@@ -131,13 +135,18 @@ mac=$(tr -d ':' < /sys/class/net/wlan0/address 2> /dev/null)
 suffix=$(printf '%s' "${mac#????????}" | tr a-f A-F)
 
 mkdir -p $RUN
+# The networks around, while the radio can still scan (as an access point it can't): the page
+# lists them to pick from, as a Naboot rabbit's does (Clara, 2026-11-21).
+ifconfig wlan0 up 2> /dev/null
+(umask 027 && /karotz/scripts/wifiscan.sh > $RUN/networks.new) && chgrp web $RUN/networks.new &&
+    mv -f $RUN/networks.new $RUN/networks || log "no scan: the page asks for the name"
+log "$(grep -c . $RUN/networks 2> /dev/null || echo 0) networks around"
 (
     umask 077
     printf 'ap_scan=2\nnetwork={\nssid="Karotz-%s"\nmode=2\nfrequency=2437\nkey_mgmt=NONE\n}\n' \
         "$suffix" > $RUN/wpa.conf
     printf 'start 192.168.75.10\nend 192.168.75.40\ninterface wlan0\nmax_leases 8\nlease_file %s/leases\npidfile %s/udhcpd.pid\nopt subnet 255.255.255.0\nopt lease 600\nopt router %s\nopt dns %s\n' \
         "$RUN" "$RUN" "$ADDR" "$ADDR" > $RUN/udhcpd.conf
-    for name in $PROBES; do echo "$name $ADDR"; done > $RUN/dnsd.conf
 )
 # The web server's rules while the setup network is open: its clients only, no login (the owner
 # doesn't know the web password Terrier OS drew), the setup page for / and for any missing path.
@@ -148,7 +157,7 @@ if [ -f $HTTPD_CONF ] && [ ! -f $RUN/httpd.conf.saved ]; then
 fi
 (
     umask 077
-    printf '# The setup network'"'"'s rules (hotspot.sh).\nA:192.168.75.0/24\nD:*\nI:setup.html\nE404:/setup.html\n' > $HTTPD_CONF.new
+    printf '# The setup network'"'"'s rules (hotspot.sh).\nA:192.168.75.0/24\nD:*\nI:setup.html\nE404:setup.html\n' > $HTTPD_CONF.new
 ) && chgrp web $HTTPD_CONF.new && chmod 640 $HTTPD_CONF.new && mv -f $HTTPD_CONF.new $HTTPD_CONF ||
     { log "the web server's rules couldn't be written"; stop; exit 1; }
 rm -f $RUN/saved $RUN/wanted
@@ -165,7 +174,12 @@ if ! wpa_supplicant -iwlan0 -Dnl80211 -B -P$RUN/wpa.pid -c$RUN/wpa.conf; then
 fi
 # busybox's own: the image links udhcpc, not udhcpd (a phone got no address, Gengar, 2026-11-20).
 busybox udhcpd $RUN/udhcpd.conf
-busybox dnsd -c $RUN/dnsd.conf -i $ADDR -t 60 -d
+# Every name is the rabbit, as a Naboot rabbit's config mode answers: a phone's check for the
+# Internet (its own name, A, AAAA or HTTPS) gets the rabbit or an empty answer, never NOTIMP, and
+# the phone opens the setup page by itself (busybox dnsd knew a list and answered AAAA with
+# NOTIMP, 2026-11-21). The probe paths the phones ask are pages that lead to setup.html.
+dnsmasq --port=53 --listen-address="$ADDR" --bind-interfaces --no-resolv --no-hosts \
+    --address="/#/$ADDR" --pid-file=$RUN/dnsmasq.pid --user=root
 : > $RUN/active
 log "Karotz-$suffix open for ${LIMIT} s: http://$ADDR/setup.html"
 killall led 2> /dev/null
