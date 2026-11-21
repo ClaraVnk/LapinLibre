@@ -148,6 +148,12 @@ urls = ["https://sources.buildroot.net/dbus/dbus-1.14.10.tar.xz", "https://dbus.
 file = "br2026/dbus/dbus-1.14.10.tar.xz"
 sha256 = "ba1f21d2bd9d339da2d4aa8780c09df32fea87998b73da24f49ab9df1e36a50f"
 
+[download.br-dnsmasq-dnsmasq-2-92rel2-tar-xz]
+group = "system"
+urls = ["https://sources.buildroot.net/dnsmasq/dnsmasq-2.92rel2.tar.xz", "https://thekelleys.org.uk/dnsmasq/dnsmasq-2.92rel2.tar.xz"]
+file = "br2026/dnsmasq/dnsmasq-2.92rel2.tar.xz"
+sha256 = "43d72b8c129bdf33d17bafedc98823f63e46b5005128066bf0d2a472a32ce06a"
+
 [download.br-dbus-glib-dbus-glib-0-114-tar-gz]
 group = "system"
 urls = ["https://sources.buildroot.net/dbus-glib/dbus-glib-0.114.tar.gz", "http://dbus.freedesktop.org/releases/dbus-glib/dbus-glib-0.114.tar.gz"]
