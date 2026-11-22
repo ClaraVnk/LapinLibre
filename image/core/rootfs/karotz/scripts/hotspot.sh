@@ -179,7 +179,7 @@ busybox udhcpd $RUN/udhcpd.conf
 # the phone opens the setup page by itself (busybox dnsd knew a list and answered AAAA with
 # NOTIMP, 2026-11-21). The probe paths the phones ask are pages that lead to setup.html.
 dnsmasq --port=53 --listen-address="$ADDR" --bind-interfaces --no-resolv --no-hosts \
-    --address="/#/$ADDR" --pid-file=$RUN/dnsmasq.pid --user=root
+    --address="/#/$ADDR" --local="/#/" --pid-file=$RUN/dnsmasq.pid --user=root
 : > $RUN/active
 log "Karotz-$suffix open for ${LIMIT} s: http://$ADDR/setup.html"
 killall led 2> /dev/null
