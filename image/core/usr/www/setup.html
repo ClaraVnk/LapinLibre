@@ -1,31 +1,65 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: MIT -->
-<!-- The setup network's page (karotz/scripts/hotspot.sh): the rabbit's Wi-Fi, then a reboot. -->
+<!-- The setup network's page (karotz/scripts/hotspot.sh): the rabbit's Wi-Fi, then a reboot.
+     The look of a Naboot rabbit's config page (nabaztag firmware-arm/pages/shared.css), so the
+     two rabbits of a house set up alike (2026-11-22). Everything inline: the page is served
+     from the rabbit's own access point, with no Internet behind it. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Karotz setup</title>
-<link rel="stylesheet" href="style.css">
+<style>
+:root{color-scheme:dark;--bg:#0e0e12;--fg:#eaeaef;--mut:#85858f;--acc:#b86bff;--card:#181820;--brd:#2a2a35;--in:#08080b;--err:#ff6b6b;--ok:#6be3a0}
+*{box-sizing:border-box}
+body{margin:0;padding:24px 16px;background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;max-width:560px;margin-inline:auto}
+h1{font-size:22px;margin:0 0 2px;font-weight:600;letter-spacing:.4px}
+h1+p{margin:0 0 20px;color:var(--mut);font-size:13px}
+fieldset{border:1px solid var(--brd);border-radius:8px;padding:14px 14px 6px;margin:0 0 10px;background:var(--card)}
+legend{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.6px;padding:0 6px}
+label{display:block;margin:0 0 10px}
+label small{display:block;color:var(--mut);font-size:11px;margin:0 0 3px}
+input{width:100%;padding:9px 10px;background:var(--in);border:1px solid var(--brd);border-radius:5px;color:var(--fg);font:14px/1.4 ui-monospace,SFMono-Regular,monospace}
+input:focus{outline:none;border-color:var(--acc)}
+.x{display:flex;gap:6px}
+.x button{flex:0 0 auto;background:transparent;border:1px solid var(--brd);color:var(--mut);padding:7px 10px;border-radius:5px;cursor:pointer;font-size:12px}
+#list{list-style:none;padding:0;margin:0 0 8px}
+.net{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;margin:0 0 6px;background:var(--in);border:1px solid var(--brd);border-radius:6px;color:var(--fg);font:14px system-ui,sans-serif;text-align:left;cursor:pointer}
+.net:hover,.net.on{border-color:var(--acc)}
+.net:disabled{opacity:.45;cursor:not-allowed}
+.net .s{color:var(--mut);font-size:12px;white-space:nowrap}
+.cta{width:100%;padding:12px;background:var(--acc);color:#fff;border:0;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer;margin:6px 0 0}
+#r{margin:14px 0 0;padding:10px 12px;border-radius:6px;font-size:13px}
+#r:empty{display:none}
+#r.ok{background:#0f2a1c;border:1px solid #1f5a3a;color:var(--ok)}
+#r.e{background:#2a0f12;border:1px solid #5a1f26;color:var(--err)}
+footer{text-align:center;margin-top:24px;color:var(--mut);font-size:12px}
+</style>
 </head>
 <body>
-<main style="max-width:28em;margin:2em auto;padding:0 1em">
-<h1>Karotz</h1>
-<p>Its Wi-Fi network / Son réseau Wi-Fi</p>
+<h1>Karotz</h1><p>Setup mode — its Wi-Fi network · Mode réglage — son réseau Wi-Fi</p>
 <form id="f">
-<div id="nets" hidden>
-<p>Networks around / Réseaux à portée</p>
-<ul id="list" style="list-style:none;padding:0;margin:0 0 1em"></ul>
-</div>
-<p><label>Network name / Nom du réseau<br><input name="ssid" id="ssid" maxlength="32" required autocomplete="off"></label></p>
-<p><label>Password / Mot de passe<br><input name="password" type="password" minlength="8" maxlength="63" required></label></p>
-<p><button>Save and restart / Enregistrer et redémarrer</button></p>
+<fieldset id="nets" hidden><legend>Networks around · Réseaux à portée</legend>
+<ul id="list"></ul>
+</fieldset>
+<fieldset><legend>Wi-Fi</legend>
+<label><small>Network name · Nom du réseau</small><input name="ssid" id="ssid" maxlength="32" required autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+<label><small>Password · Mot de passe</small>
+<span class="x"><input name="password" id="pw" type="password" minlength="8" maxlength="63" required autocomplete="off">
+<button type="button" id="show">show</button></span></label>
+</fieldset>
+<button class="cta">Save and restart · Enregistrer et redémarrer</button>
 </form>
 <p id="r" role="status"></p>
-</main>
+<footer>Terrier OS · 2.4 GHz only · 2,4 GHz seulement</footer>
 <script>
 // The networks the rabbit saw before it opened this one (hotspot.sh, wifiscan.sh), strongest
 // first: a tap fills the name, as on a Naboot rabbit's page. A hidden network is typed.
+var pw = document.getElementById("pw");
+document.getElementById("show").addEventListener("click", function () {
+  pw.type = pw.type === "text" ? "password" : "text";
+  this.textContent = pw.type === "text" ? "hide" : "show";
+});
 fetch("/cgi-bin/wifi_networks").then(function (a) { return a.json(); }).then(function (nets) {
   if (!nets.length) return;
   var list = document.getElementById("list");
@@ -33,16 +67,19 @@ fetch("/cgi-bin/wifi_networks").then(function (a) { return a.json(); }).then(fun
     var li = document.createElement("li");
     var b = document.createElement("button");
     b.type = "button";
-    b.style.cssText = "width:100%;text-align:left;margin:0 0 .4em;display:flex;justify-content:space-between";
+    b.className = "net";
     var name = document.createElement("span");
     name.textContent = n.ssid;
     var info = document.createElement("span");
-    info.textContent = (n.q >= 67 ? "▂▄▆" : n.q >= 34 ? "▂▄" : "▂") + (n.sec === "open" ? "" : " 🔒");
+    info.className = "s";
+    info.textContent = (n.sec === "open" ? "" : n.sec + " 🔒 ") + (n.q >= 67 ? "▂▄▆" : n.q >= 34 ? "▂▄" : "▂");
     if (n.sec === "open") { b.disabled = true; b.title = "open networks are not taken / réseau ouvert non pris en charge"; }
     b.appendChild(name); b.appendChild(info);
     b.addEventListener("click", function () {
+      [].forEach.call(document.querySelectorAll(".net.on"), function (o) { o.classList.remove("on"); });
+      b.classList.add("on");
       document.getElementById("ssid").value = n.ssid;
-      document.querySelector("input[name=password]").focus();
+      pw.focus();
     });
     li.appendChild(b); list.appendChild(li);
   });
@@ -54,11 +91,13 @@ document.getElementById("f").addEventListener("submit", function (e) {
   fetch("/cgi-bin/wifi_setup", {method: "POST", body: new URLSearchParams(new FormData(e.target))})
     .then(function (a) { return a.json(); })
     .then(function (j) {
-      r.textContent = j.return === "0"
+      var ok = j.return === "0";
+      r.className = ok ? "ok" : "e";
+      r.textContent = ok
         ? "Saved: the rabbit restarts on that network. / Enregistré : le lapin redémarre sur ce réseau."
         : (j.msg || "Refused / Refusé");
     })
-    .catch(function () { r.textContent = "No answer / Pas de réponse"; });
+    .catch(function () { r.className = "e"; r.textContent = "No answer / Pas de réponse"; });
 });
 </script>
 </body>
