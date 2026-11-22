@@ -221,6 +221,7 @@ rootfs:karotz/scripts/startup.sh f 0755 0:0
 rootfs:karotz/scripts/udhcpc_script.sh f 0755 0:0
 rootfs:karotz/scripts/usbkey.sh f 0755 0:0
 rootfs:karotz/scripts/web-files.sh f 0755 0:0
+rootfs:karotz/scripts/wifiscan.sh f 0755 0:0
 rootfs:karotz/scripts/www d 0755 0:0
 rootfs:karotz/sounds d 0775 0:0
 rootfs:lib d 0755 0:0
@@ -1473,6 +1474,7 @@ usr:lib/python2.4/zipfile.py f 0644 0:0
 usr:lib/terminfo l 0777 0:0 -> /usr/share/terminfo
 usr:sbin d 0755 0:0
 usr:sbin/crda f 0755 0:0
+usr:sbin/dnsmasq f 0755 0:0
 usr:sbin/iw f 0755 0:0
 usr:sbin/mdnsd f 0755 0:0
 usr:sbin/wpa_supplicant f 0755 0:0
@@ -1500,6 +1502,7 @@ usr:share/lapinlibre/web-tags.sh f 0644 0:0
 usr:share/lapinlibre/web.sh f 0644 0:0
 usr:www d 0755 0:0
 usr:www/app.js f 0644 0:0
+usr:www/canonical.html f 0644 0:0
 usr:www/cgi-bin d 0755 0:0
 usr:www/cgi-bin/apps d 0755 0:0
 usr:www/cgi-bin/apps/clock f 0755 0:0
@@ -1553,7 +1556,18 @@ usr:www/cgi-bin/tools_ps f 0755 0:0
 usr:www/cgi-bin/tts f 0755 0:0
 usr:www/cgi-bin/voice_list f 0755 0:0
 usr:www/cgi-bin/wakeup f 0755 0:0
+usr:www/cgi-bin/wifi_networks f 0755 0:0
 usr:www/cgi-bin/wifi_setup f 0755 0:0
+usr:www/check_network_status.txt f 0644 0:0
+usr:www/connecttest.txt f 0644 0:0
+usr:www/gen_204 f 0644 0:0
+usr:www/generate_204 f 0644 0:0
+usr:www/hotspot-detect.html f 0644 0:0
 usr:www/index.html f 0644 0:0
+usr:www/library d 0755 0:0
+usr:www/library/test d 0755 0:0
+usr:www/library/test/success.html f 0644 0:0
+usr:www/ncsi.txt f 0644 0:0
 usr:www/setup.html f 0644 0:0
 usr:www/style.css f 0644 0:0
+usr:www/success.txt f 0644 0:0

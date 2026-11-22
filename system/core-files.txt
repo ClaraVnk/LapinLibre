@@ -1269,6 +1269,7 @@ usr:sbin d 0755 0:0
 usr:sbin/crda f 0755 0:0 target:sbin/crda
 usr:sbin/iw f 0755 0:0 target
 usr:sbin/wpa_supplicant f 0755 0:0 target
+usr:sbin/dnsmasq f 0755 0:0 target  # the setup network's DNS: every name is the rabbit (hotspot.sh)
 usr:scripts d 0755 0:0
 usr:scripts/k2k d 0755 0:0
 usr:scripts/k2k/playback f 0755 0:0 own
@@ -1306,6 +1307,7 @@ rootfs:karotz/scripts/udhcpc_script.sh f 0755 0:0 target:usr/share/udhcpc/defaul
 rootfs:karotz/scripts/sshd.sh f 0755 0:0 core
 rootfs:karotz/scripts/inetd.sh f 0755 0:0 core
 rootfs:karotz/scripts/hotspot.sh f 0755 0:0 core  # the setup network (a long press with no network)
+rootfs:karotz/scripts/wifiscan.sh f 0755 0:0 core  # the networks around, for the setup page (hotspot.sh)
 rootfs:karotz/scripts/web-files.sh f 0755 0:0 core  # the web user's folders and locks, for inetd.sh and S40lapinlibre
 rootfs:lib/firmware/rt73.bin f 0644 0:0 generated  # the Wi-Fi's firmware, linux-firmware 20260916
 rootfs:lib/firmware/LICENCE.ralink-firmware.txt f 0644 0:0 generated  # its licence, which must travel with it
@@ -1337,7 +1339,19 @@ usr:www/cgi-bin/ears_mode f 0755 0:0 core  # keeps its one setting in /usr/etc/c
 usr:www/cgi-bin/sleep f 0755 0:0 core  # the API's own sleep flag, in RAM
 usr:www/cgi-bin/wakeup f 0755 0:0 core
 usr:www/setup.html f 0644 0:0 core  # the setup network's page
+usr:www/hotspot-detect.html f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/generate_204 f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/gen_204 f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/ncsi.txt f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/connecttest.txt f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/success.txt f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/canonical.html f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/check_network_status.txt f 0644 0:0 core  # a phone's Internet check on the setup network: leads to setup.html
+usr:www/library d 0755 0:0
+usr:www/library/test d 0755 0:0
+usr:www/library/test/success.html f 0644 0:0 core  # Apple's other check path
 usr:www/cgi-bin/wifi_setup f 0755 0:0 core  # the setup network's form, dropped for hotspot.sh
+usr:www/cgi-bin/wifi_networks f 0755 0:0 core  # the networks hotspot.sh saw, for the setup page
 usr:www/cgi-bin/sound f 0755 0:0 core
 usr:www/cgi-bin/sound_control f 0755 0:0 core
 usr:www/cgi-bin/sound_list f 0755 0:0 core
