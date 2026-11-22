@@ -1539,6 +1539,7 @@ usr:www/cgi-bin/rfid_stop_record f 0755 0:0
 usr:www/cgi-bin/rfid_test_url f 0755 0:0
 usr:www/cgi-bin/rfid_unassign f 0755 0:0
 usr:www/cgi-bin/setclock f 0755 0:0
+usr:www/cgi-bin/setup_diag f 0755 0:0
 usr:www/cgi-bin/sleep f 0755 0:0
 usr:www/cgi-bin/snapshot f 0755 0:0
 usr:www/cgi-bin/snapshot_get f 0755 0:0

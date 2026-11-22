@@ -1,0 +1,30 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# setup_diag (GET): what a Karotz that never reached its server can still say, for the setup
+# page's Diagnostic block, only while the setup network is open (Clara, 2026-11-22: "le Karotz
+# a aussi la page diagnostic pour pouvoir m'aider ?"; a Naboot rabbit's config page has one).
+# The owner sends a photo of it. Never a secret: the Wi-Fi's name only, and the client's last
+# failing step as diag.c keeps it (dns, tcp, auth, os-layout) with how often it failed.
+. /usr/share/lapinlibre/web.sh
+web_begin setup
+[ -f /var/run/hotspot/active ] || web_refuse 403 "the setup network isn't open"
+jo_begin
+first_line /usr/etc/conf/sys_version
+jo_str os "${FL:-?}"
+v=""
+[ -x /usr/etc/conf/terrier/terrier-karotz ] &&
+    v=$(/usr/etc/conf/terrier/terrier-karotz --version 2> /dev/null | head -n 1)
+jo_str client "${v:-none}"
+first_line /sys/class/net/wlan0/address
+jo_str mac "${FL:-?}"
+ssid=""
+[ -r /usr/etc/conf/wpa.conf ] &&
+    ssid=$(sed -n 's/^[[:space:]]*ssid="\(.*\)"[[:space:]]*$/\1/p' /usr/etc/conf/wpa.conf | head -n 1)
+jo_str wifi "${ssid:-none}"
+first_line /usr/etc/conf/terrier/diag
+jo_str step "${FL:-none}"
+log=""
+[ -r /usr/etc/conf/hotspot.log ] && log=$(tail -n 4 /usr/etc/conf/hotspot.log)
+jo_str hotspot "$log"
+web_ok
+reply_json "{$JO}"

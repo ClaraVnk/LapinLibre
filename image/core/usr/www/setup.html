@@ -33,6 +33,12 @@ input:focus{outline:none;border-color:var(--acc)}
 #r:empty{display:none}
 #r.ok{background:#0f2a1c;border:1px solid #1f5a3a;color:var(--ok)}
 #r.e{background:#2a0f12;border:1px solid #5a1f26;color:var(--err)}
+details{margin:14px 0}
+summary{cursor:pointer;color:var(--mut);font-size:13px;padding:6px 0}
+#diag dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:13px}
+#diag dt{color:var(--mut)}
+#diag dd{margin:0;font-family:ui-monospace,SFMono-Regular,monospace;overflow-wrap:anywhere}
+#diag pre{margin:8px 0 0;white-space:pre-wrap;font-size:11px;color:var(--mut)}
 footer{text-align:center;margin-top:24px;color:var(--mut);font-size:12px}
 </style>
 </head>
@@ -51,6 +57,17 @@ footer{text-align:center;margin-top:24px;color:var(--mut);font-size:12px}
 <button class="cta">Save and restart · Enregistrer et redémarrer</button>
 </form>
 <p id="r" role="status"></p>
+<details id="diag" hidden><summary>Diagnostic</summary>
+<fieldset><legend>Send a photo of this to Le Terrier · Envoie une photo de ceci au Terrier</legend>
+<dl>
+<dt>Terrier OS</dt><dd id="d-os"></dd>
+<dt>Client</dt><dd id="d-client"></dd>
+<dt>MAC</dt><dd id="d-mac"></dd>
+<dt>Wi-Fi</dt><dd id="d-wifi"></dd>
+<dt>Last failure · Dernier échec</dt><dd id="d-step"></dd>
+</dl>
+<pre id="d-log"></pre>
+</fieldset></details>
 <footer>Terrier OS · 2.4 GHz only · 2,4 GHz seulement</footer>
 <script>
 // The networks the rabbit saw before it opened this one (hotspot.sh, wifiscan.sh), strongest
@@ -84,6 +101,20 @@ fetch("/cgi-bin/wifi_networks").then(function (a) { return a.json(); }).then(fun
     li.appendChild(b); list.appendChild(li);
   });
   document.getElementById("nets").hidden = false;
+}).catch(function () {});
+// What a Karotz that never reached its server can still say (cgi-bin/setup_diag): a photo of it
+// tells Le Terrier where it stopped. diag.c's steps, said in words.
+var STEPS = {dns: "the Terrier's name not found (DNS) · nom du Terrier introuvable",
+  tcp: "the Terrier unreachable · Terrier injoignable", auth: "its key refused · sa clé refusée",
+  "os-layout": "an update refused · une mise à jour refusée"};
+fetch("/cgi-bin/setup_diag").then(function (a) { return a.json(); }).then(function (d) {
+  function put(id, v) { document.getElementById(id).textContent = v; }
+  put("d-os", d.os); put("d-client", d.client); put("d-mac", d.mac); put("d-wifi", d.wifi);
+  var st = (d.step || "none").split(" ");
+  put("d-step", st[0] === "none" ? "none · aucun"
+    : (STEPS[st[0]] || st[0]) + (st[1] ? " ×" + st[1] : ""));
+  put("d-log", d.hotspot || "");
+  document.getElementById("diag").hidden = false;
 }).catch(function () {});
 document.getElementById("f").addEventListener("submit", function (e) {
   e.preventDefault();
