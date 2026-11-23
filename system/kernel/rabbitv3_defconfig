@@ -346,7 +346,7 @@ CONFIG_ZBOOT_ROM_TEXT=0x0
 CONFIG_ZBOOT_ROM_BSS=0x0
 CONFIG_CMDLINE="root=/dev/hda1 ro init=/bin/bash console=ttySAC0"
 # CONFIG_XIP_KERNEL is not set
-# CONFIG_KEXEC is not set
+CONFIG_KEXEC=y
 
 #
 # CPU Power Management
