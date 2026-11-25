@@ -55,7 +55,22 @@ mdev -s
 ln -s mtdblock1 /dev/kernel
 
 # --- /usr, from the flash ---
-mount -t yaffs /dev/mtdblock6 /usr
+# Under Linux 6.x (the Karotz kernel of Terrier OS 1.0, FLASH-PLAN step 2, 2026-11-25) /usr is
+# mounted read-only, YAFFS written by 6.1 being not yet proven, with /usr/etc (/etc, the client's
+# settings and key among it) and /usr/terrier copied into RAM over it: run.sh appends to
+# client.log and udhcpc writes resolv.conf there (Gengar under 6.1 by kexec, 2026-11-24). What is
+# changed there under 6.x is lost at the next start. 2.6.32 mounts it read-write, as always.
+case "$(uname -r)" in
+    6.*)
+        mount -t yaffs -o ro /dev/mtdblock6 /usr
+        for d in /usr/etc /usr/terrier; do
+            [ -d "$d" ] || continue
+            m=/var/rw$(echo "$d" | tr / _)
+            mkdir -p "$m" && cp -a "$d/." "$m/" && mount --bind "$m" "$d"
+        done ;;
+    *)
+        mount -t yaffs /dev/mtdblock6 /usr ;;
+esac
 mkdir -p /usr/etc/conf
 
 # --- /etc (= /usr/etc): the root's own files, so a new install's are always the ones used ---
