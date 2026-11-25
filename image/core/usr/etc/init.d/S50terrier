@@ -4,7 +4,10 @@
 # It runs when the install wrote its settings (lapinlibre.txt's TERRIER=, applysettings.sh), from
 # its own folder in /usr/etc/conf, which installs keep: the rabbit's adoption key lives there, and
 # the client's signed updates replace its binary there. The image's copy (/usr/karotz/terrier) is
-# put there the first time only, so a newer client the Terrier sent is not taken back by a reinstall.
+# put there the first time, and again when it is newer than the one there: a reinstall never takes
+# back a newer client the Terrier sent, and brings an older one forward (Terrier OS 0.3.0 kept
+# Gengar's 0.1.19 beside its built-in 0.1.20, 2026-11-25: a rabbit offline since its update could
+# not get the client a USB key was meant to bring).
 DIR=/usr/etc/conf/terrier
 SHIPPED=/usr/karotz/terrier
 
@@ -18,6 +21,20 @@ esac
 
 [ -f "$DIR/settings" ] || exit 0          # no TERRIER=: the rabbit is not a Terrier rabbit
 grep -q '^SERVER=.' "$DIR/settings" || exit 0
+# "terrier-karotz 0.1.20 (...)" -> 0.1.20
+version() { "$1" --version 2> /dev/null | head -n 1 | awk '{print $2}'; }
+# 0 when $1 is a newer x.y.z than $2 (an unreadable one is older)
+newer() {
+    awk -v a="$1" -v b="$2" 'BEGIN { if (a !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 1
+        if (b !~ /^[0-9]+\.[0-9]+\.[0-9]+$/) exit 0
+        split(a, x, "."); split(b, y, ".")
+        for (i = 1; i <= 3; i++) { if (x[i] + 0 > y[i] + 0) exit 0; if (x[i] + 0 < y[i] + 0) exit 1 }
+        exit 1 }'
+}
+if [ -x "$DIR/terrier-karotz" ] && [ -f "$SHIPPED/terrier-karotz" ] &&
+        newer "$(version "$SHIPPED/terrier-karotz")" "$(version "$DIR/terrier-karotz")"; then
+    rm -f "$DIR/terrier-karotz" "$DIR/run.sh"     # both again, from the image, below
+fi
 for f in terrier-karotz run.sh; do
     if [ ! -x "$DIR/$f" ] && [ -f "$SHIPPED/$f" ]; then
         cp "$SHIPPED/$f" "$DIR/$f.new" && chmod 755 "$DIR/$f.new" && mv -f "$DIR/$f.new" "$DIR/$f"
