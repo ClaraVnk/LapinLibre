@@ -338,6 +338,48 @@ class UsbKeyTest(unittest.TestCase):
         self.assertIn("admin:givenpass9@", (r.sb / "usr/etc/conf/terrier/settings").read_text())
         self.assertFalse((r.sb / "mnt/usbkey/web-password.txt").exists())
 
+    def test_the_install_keeps_the_owners_client_options(self):
+        # Gengar's ears lay flat after each install (2026-11-24, 11-25): EXTRA was written anew and
+        # its --ears-up 14 lost. The old --ok goes (the new password's comes), the rest stays.
+        r = self.rabbit("terrier-kept", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n"
+                                                 "TERRIER=terrier.example.com\nWEB_PASSWORD=givenpass9\n")
+        (r.sb / "usr/etc/conf/terrier").mkdir(parents=True)
+        (r.sb / "usr/etc/conf/terrier/settings").write_text(
+            "SERVER=old.example.com\nEXTRA='--ok http://admin:oldpass@127.0.0.1 --ears-up 14'\n")
+        r.boot()
+        settings = (r.sb / "usr/etc/conf/terrier/settings").read_text()
+        self.assertIn("EXTRA='--ok http://admin:givenpass9@127.0.0.1 --ears-up 14'\n", settings)
+        self.assertNotIn("oldpass", settings)
+        # Shell signs in the old options: not carried into a file run.sh sources.
+        r = self.rabbit("terrier-unkept", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n"
+                                                   "TERRIER=terrier.example.com\nWEB_PASSWORD=givenpass9\n")
+        (r.sb / "usr/etc/conf/terrier").mkdir(parents=True)
+        (r.sb / "usr/etc/conf/terrier/settings").write_text("SERVER=a\nEXTRA='--x $(reboot)'\n")
+        r.boot()
+        self.assertIn("EXTRA='--ok http://admin:givenpass9@127.0.0.1'\n",
+                      (r.sb / "usr/etc/conf/terrier/settings").read_text())
+
+    def test_the_install_speaks_the_rabbits_language(self):
+        # No LANGUAGE on the key: the rabbit's own (karotz.conf), not English (Gengar, 2026-11-25).
+        r = self.rabbit("speaks-rabbit", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n")
+        (r.sb / "usr/etc/conf/karotz.conf").write_text("[karotz]\nlang=fr-FR\n")
+        r.boot()
+        self.assertEqual((r.sb / "tmp" / "install-start.mp3").read_bytes(),
+                         (self.key / "sound/fr/install-start.mp3").read_bytes())
+
+    def test_a_spoiled_write_is_written_once_more(self):
+        # The first write of each partition reads back wrong: written again, then identical.
+        r = self.rabbit("spoiled-once", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n")
+        log = r.sb / "actions.log"
+        stub(r.sb / "sbin/nandwrite", f'echo "write $2 $3" >> {log}; cp "$3" "$2"; '
+                                      f'[ -e "$2.once" ] || {{ : > "$2.once"; printf X | dd of="$2" bs=1 seek=100 conv=notrunc 2>/dev/null; }}')
+        r.boot()
+        self.assert_flashed(r)
+        writes = [a for a in r.actions() if a.startswith("write ")]
+        self.assertEqual(len(writes), 4, writes)
+        self.assertIn("zImage: the read-back of mtd1 differs; writing it once more", r.setuplog())
+        self.assertIn("zImage: read back from mtd1, identical", r.setuplog())
+
     def test_terrier_off_and_a_bad_terrier(self):
         r = self.rabbit("terrier-off", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\nTERRIER=off\n")
         (r.sb / "usr/etc/conf/terrier").mkdir(parents=True)

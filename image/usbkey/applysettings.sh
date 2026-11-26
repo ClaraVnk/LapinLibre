@@ -178,9 +178,18 @@ if [ "${TERRIER}" = off ]; then
     rm -f "${TERRIER_DIR}/settings"
     LOG "Settings: no Terrier client"
 elif [ -n "${TERRIER}" ]; then
+    # The owner's own options stay (--ears-up N, Gengar's ears flat after each install, 2026-11-24
+    # and 11-25): everything of the old EXTRA but its --ok, which is the new password's.
+    KEPT=
+    if [ -f "${TERRIER_DIR}/settings" ]; then
+        KEPT=$(sed -n "s/^EXTRA=['\"]\{0,1\}\(.*\)/\1/p" "${TERRIER_DIR}/settings" | head -n 1 |
+            sed -e "s/['\"]\$//" -e 's/--ok [^ ]*//' -e 's/  */ /g' -e 's/^ //' -e 's/ $//')
+        case "${KEPT}" in *[\'\"\`\$\;\&\|\\]*) LOG "Settings: the old client options are not kept (quotes or shell signs)"; KEPT= ;; esac
+    fi
     mkdir -p "${TERRIER_DIR}" && chmod 700 "${TERRIER_DIR}" &&
-        (umask 077 && printf "SERVER=%s\nEXTRA='--ok http://admin:%s@127.0.0.1'\n" "${TERRIER}" "${WEB_PASSWORD}" \
-            > "${TERRIER_DIR}/settings") || ERROR "can't write the Terrier client's settings"
+        (umask 077 && printf "SERVER=%s\nEXTRA='--ok http://admin:%s@127.0.0.1%s'\n" "${TERRIER}" "${WEB_PASSWORD}" \
+            "${KEPT:+ ${KEPT}}" > "${TERRIER_DIR}/settings") || ERROR "can't write the Terrier client's settings"
+    [ -z "${KEPT}" ] || LOG "Settings: the client's options kept: ${KEPT}"
     LOG "Settings: Terrier ${TERRIER}"
     if [ -n "${WEB_PASSWORD_DRAWN}" ]; then
         printf 'The web page password of this rabbit (user admin): %s\r\n' "${WEB_PASSWORD}" \

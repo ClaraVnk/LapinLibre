@@ -112,11 +112,9 @@ play checks-passed.mp3
 play install-start.mp3
 start_loop
 LOG "Writing the kernel to mtd1"
-erase_partition /dev/mtd1 || ERROR "erasing mtd1 failed"
-/sbin/nandwrite -pm /dev/mtd1 /tmp/zImage || ERROR "writing zImage to mtd1 failed"
+write_partition /dev/mtd1 /tmp/zImage zImage
 LOG "Writing the root filesystem to mtd2"
-erase_partition /dev/mtd2 || ERROR "erasing mtd2 failed"
-/sbin/nandwrite -pm /dev/mtd2 /tmp/rootfs.img.gz || ERROR "writing rootfs.img.gz to mtd2 failed"
+write_partition /dev/mtd2 /tmp/rootfs.img.gz rootfs.img.gz
 
 # 5. /usr: the rabbit's karotz.conf and voice.conf kept aside, /usr cleaned, the new one unpacked.
 for f in karotz.conf voice.conf; do

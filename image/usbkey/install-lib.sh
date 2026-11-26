@@ -84,6 +84,10 @@ start_tools() {
     local la
     la=$(sed -n 's/^[[:space:]]*LANGUAGE[[:space:]]*=[[:space:]]*["'"'"']*\([a-zA-Z][a-zA-Z]\).*/\1/p' \
         /mnt/usbkey/lapinlibre.txt 2> /dev/null | head -n 1 | tr 'A-Z' 'a-z')
+    # No LANGUAGE on the key: the rabbit's own (karotz.conf's lang=fr-FR, which applysettings.sh
+    # keeps), not English (Gengar spoke English through its 0.3.0 install, 2026-11-25).
+    [ -n "${la}" ] || la=$(sed -n 's/^[[:space:]]*lang[[:space:]]*=[[:space:]]*\([a-zA-Z][a-zA-Z]\).*/\1/p' \
+        /usr/etc/conf/karotz.conf 2> /dev/null | head -n 1 | tr 'A-Z' 'a-z')
     if [ -n "${la}" ] && [ -d "/mnt/usbkey/sound/${la}" ]; then
         cp /mnt/usbkey/sound/"${la}"/*.mp3 /tmp/ 2> /dev/null
     fi
@@ -134,6 +138,37 @@ erase_partition() { # device
     else
         /sbin/flash_eraseall "$1"
     fi
+}
+
+# A partition read back against the file written into it, its first bytes as many as the file's
+# (nandwrite -p pads the last page): whole pages, then the rest a byte at a time. dd on the
+# character device, which every kernel the install runs under has (the factory's has no nanddump).
+# Terrier OS 1.0.0 writes Linux 6.1 here, and nothing read the kernel back before (FLASH-PLAN
+# step 3's flash-kernel does).
+read_back_ok() { # device file
+    local n ws full rest
+    n=$(wc -c < "$2")
+    ws=$(cat "/sys/class/mtd/${1##*/}/writesize" 2> /dev/null)
+    case "${ws}" in ''|*[!0-9]*|0) ws=2048 ;; esac
+    full=$(( n / ws )); rest=$(( n - full * ws ))
+    [ "$({ dd if="$1" bs="${ws}" count="${full}" 2> /dev/null
+           [ "${rest}" -eq 0 ] || dd if="$1" bs=1 skip=$(( full * ws )) count="${rest}" 2> /dev/null
+         } | md5sum | cut -d' ' -f1)" = "$(md5sum < "$2" | cut -d' ' -f1)" ]
+}
+
+# Write a file into a partition and read it back; a difference is written once more. Twice
+# different is logged and the install carries on, as before the read-back existed: a bad block
+# that nandwrite skipped reads differently through dd, and stopping there would leave the
+# partition erased.
+write_partition() { # device file name
+    erase_partition "$1" || ERROR "erasing ${1##*/} failed"
+    /sbin/nandwrite -pm "$1" "$2" || ERROR "writing $3 to ${1##*/} failed"
+    read_back_ok "$1" "$2" && { LOG "$3: read back from ${1##*/}, identical"; return 0; }
+    LOG "$3: the read-back of ${1##*/} differs; writing it once more"
+    erase_partition "$1" || ERROR "erasing ${1##*/} failed"
+    /sbin/nandwrite -pm "$1" "$2" || ERROR "writing $3 to ${1##*/} failed"
+    read_back_ok "$1" "$2" && { LOG "$3: read back from ${1##*/}, identical"; return 0; }
+    LOG "$3: the read-back of ${1##*/} differs again (a bad block?); carrying on"
 }
 
 # Remove everything in a directory (hidden names too) but the names given.

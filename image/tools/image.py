@@ -356,7 +356,21 @@ def build(out):
         raise ImageError(f"no {kernel_file} (run ./build.sh kernel)")
     rootfs, usr = make_core(config, epoch, version, changes)
 
-    kernel = kernel_file.read_bytes()
+    # Terrier OS 1.0.0 installs Linux 6.1 into mtd1 (LL_FLASH_KERNEL, built from nabaztag's
+    # karotz/kernel): 2.6.32 is still built for the userland's headers and mdev, and is not on the
+    # key. The ramdisk boots under both (linuxrc, FLASH-PLAN steps 2 and 6), proven on Gengar
+    # 2026-11-26 with 6.1 in its flash.
+    flash_kernel = os.environ.get("LL_FLASH_KERNEL", "")
+    if flash_kernel:
+        kernel_file = Path(flash_kernel)
+        if not kernel_file.is_file():
+            raise ImageError(f"LL_FLASH_KERNEL: no {kernel_file}")
+        kernel = kernel_file.read_bytes()
+        if kernel[0x24:0x28] != bytes.fromhex("18286f01"):
+            raise ImageError(f"LL_FLASH_KERNEL: {kernel_file} is not a zImage")
+        changes.append(f"kernel: the flash kernel {kernel_file.name}, {len(kernel)} bytes (LL_FLASH_KERNEL)")
+    else:
+        kernel = kernel_file.read_bytes()
     rootfs_img = rootfs.serialize()
     images = {"zImage": kernel, "rootfs.img.gz": gz(rootfs_img, "rootfs.img", epoch), "usr.tar.gz": gz(usr.serialize(), "", epoch)}
     limits = config["limits"]
