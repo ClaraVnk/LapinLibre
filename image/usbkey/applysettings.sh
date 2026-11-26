@@ -146,8 +146,18 @@ fi
 TERRIER_DIR=${CONF}/terrier
 WEB_PASSWORD_DRAWN=
 if [ -n "${TERRIER}" ] && [ "${TERRIER}" != off ] && [ -z "${WEB_PASSWORD}" ]; then
-    WEB_PASSWORD=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
-    [ ${#WEB_PASSWORD} -eq 32 ] || ERROR "can't draw a web password"
+    # One drawn earlier stays (the client has it, the rabbit's web API too): a key left plugged in
+    # drew a new one at every boot (Gengar, Terrier OS 1.0.0, 2026-11-26). Only a drawn one, which
+    # is 32 hexadecimal characters and closed the API to the network (web_local_only).
+    if [ -e "${CONF}/web_local_only" ] && [ -f "${TERRIER_DIR}/settings" ]; then
+        WEB_PASSWORD=$(sed -n 's#.*--ok http://admin:\([0-9a-f]\{32\}\)@127\.0\.0\.1.*#\1#p' "${TERRIER_DIR}/settings" | head -n 1)
+    fi
+    if [ ${#WEB_PASSWORD} -eq 32 ]; then
+        LOG "Settings: the web password drawn earlier is kept"
+    else
+        WEB_PASSWORD=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
+        [ ${#WEB_PASSWORD} -eq 32 ] || ERROR "can't draw a web password"
+    fi
     WEB_PASSWORD_DRAWN=1
 fi
 # The web password as given; the rabbit hashes it at its next start (inetd.sh) and removes this.

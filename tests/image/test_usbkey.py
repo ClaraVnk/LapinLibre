@@ -359,6 +359,29 @@ class UsbKeyTest(unittest.TestCase):
         self.assertIn("EXTRA='--ok http://admin:givenpass9@127.0.0.1'\n",
                       (r.sb / "usr/etc/conf/terrier/settings").read_text())
 
+    def test_a_drawn_password_is_kept_at_the_next_boot(self):
+        # The key left plugged in: the settings are applied at each boot, and the password drawn
+        # the first time stays (Gengar, 2026-11-26: a new one at every boot).
+        settings = "WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\nTERRIER=terrier.example.com\n"
+        r = self.rabbit("drawn-kept", settings=settings)
+        conf = r.sb / "usr/etc/conf"
+        (conf / "terrier").mkdir(parents=True)
+        (conf / "terrier/settings").write_text(
+            "SERVER=terrier.example.com\nEXTRA='--ok http://admin:" + "ab" * 16 + "@127.0.0.1 --ears-up 14'\n")
+        (conf / "web_local_only").write_text("")
+        r.boot()
+        got = (conf / "terrier/settings").read_text()
+        self.assertIn("EXTRA='--ok http://admin:" + "ab" * 16 + "@127.0.0.1 --ears-up 14'\n", got)
+        self.assertIn("the web password drawn earlier is kept", r.setuplog())
+        self.assertTrue((conf / "web_local_only").exists())
+        # Without web_local_only the password was the owner's: none on the key draws a new one.
+        r = self.rabbit("drawn-new", settings=settings)
+        conf = r.sb / "usr/etc/conf"
+        (conf / "terrier").mkdir(parents=True)
+        (conf / "terrier/settings").write_text("SERVER=a\nEXTRA='--ok http://admin:" + "ab" * 16 + "@127.0.0.1'\n")
+        r.boot()
+        self.assertNotIn("ab" * 16, (conf / "terrier/settings").read_text())
+
     def test_the_install_speaks_the_rabbits_language(self):
         # No LANGUAGE on the key: the rabbit's own (karotz.conf), not English (Gengar, 2026-11-25).
         r = self.rabbit("speaks-rabbit", settings="WIFI_SSID=testssid\nWIFI_PASSWORD=testpassword\n")
