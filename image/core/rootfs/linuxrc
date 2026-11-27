@@ -31,7 +31,10 @@ mknod -m 0660 /dev/uba b 180 0
 mknod -m 0660 /dev/uba1 b 180 1
 mknod -m 0660 /dev/ubb b 180 16
 mknod -m 0660 /dev/ubb1 b 180 17
-mknod -m 0660 /dev/rtc0 c 254 0
+# The RTC's numbers from sysfs: its major is dynamic, 254 under 2.6.32 but 253 under 6.1, where 254
+# is gpiochip's (Gengar 2026-11-27: hwclock talked to gpiochip0 and got EINVAL).
+rtc=$(cat /sys/class/rtc/rtc0/dev 2> /dev/null || echo 254:0)
+mknod -m 0660 /dev/rtc0 c "${rtc%:*}" "${rtc#*:}"
 # The rabbit's own drivers: the ears, the button and the power switch.
 mknod -m 0660 /dev/rabbit_ears c 60 0
 mknod -m 0660 /dev/rabbit_button c 52 0
