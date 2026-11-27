@@ -39,6 +39,13 @@ nose_pulse() {
         > /dev/null 2>&1
 }
 
+# Terrier OS: is the Le Terrier client this rabbit's (S50terrier's test)? It owns the LED then:
+# the ready pulse came after the client had put the belly out and stayed green for good, the client
+# believing it dark (Gengar, 2026-11-27, Clara: "le ventre vert quand il redémarre").
+terrier_rabbit() {
+    [ -f /usr/etc/conf/terrier/settings ] && grep -q '^SERVER=.' /usr/etc/conf/terrier/settings
+}
+
 # Is the clock set (by ntpd)?
 clock_set() {
     [ "$(date +%s)" -ge $CLOCK_SET_AFTER ]
@@ -68,7 +75,7 @@ services() {
         i=$((i + 1))
     done
     killall led 2> /dev/null
-    nose_pulse 00FFFF 400 || log "led-daemon didn't take the waiting pulse"
+    terrier_rabbit || nose_pulse 00FFFF 400 || log "led-daemon didn't take the waiting pulse"
     # The clock: ntpd keeps it set for as long as the rabbit runs (immortaldog restarts it), and
     # tries again until a time server answers. The ready signal waits for it at most 30 s.
     $IMMORTALDOG $NTPD_PID /bin/busybox ntpd -n -p $NTP_SERVER
@@ -82,8 +89,9 @@ services() {
     else
         log "the clock isn't set yet: ntpd keeps trying $NTP_SERVER"
     fi
-    # Ready: led-daemon pulses the nose green for good.
-    nose_pulse 00FF00 700 || log "led-daemon didn't take the ready pulse"
+    # Ready: led-daemon pulses the nose green for good, unless the Terrier's client owns it (the
+    # boot sound still says ready).
+    terrier_rabbit || nose_pulse 00FF00 700 || log "led-daemon didn't take the ready pulse"
     /usr/bin/karotz-player /usr/karotz/sounds/boot-ready.wav > /dev/null 2>&1
     log "end"
 }
